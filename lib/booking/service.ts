@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { BOOKING_TIME_SLOTS } from "@/lib/booking/hours";
+import { calculateEntranceTotal } from "@/lib/booking/pricing";
 
 export type PicnicAreaRecord = {
   id: string;
@@ -39,7 +40,7 @@ export function toDateValue(dateValue: string): Date | null {
 }
 
 export function calculateBookingTotal(adults: number, children3Plus: number, childrenUnder3: number): number {
-  return adults * 50 + children3Plus * 25 + childrenUnder3 * 0;
+  return calculateEntranceTotal({ adults, children3Plus, under3: childrenUnder3 });
 }
 
 export async function getActivePicnicAreas(): Promise<{ data: PicnicAreaRecord[]; error: string | null }> {
