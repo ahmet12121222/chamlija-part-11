@@ -1,23 +1,23 @@
 const FEATURES = [
   {
     number: "01",
-    title: "Nature",
-    description: "Lush green surroundings and shaded corners for a true escape outdoors.",
+    title: "Doğa",
+    description: "Yeşilin her tonunu barındıran, gölgelik köşeleriyle tam bir dışarıda kaçış hissi sunar.",
   },
   {
     number: "02",
-    title: "Family Friendly",
-    description: "Safe, relaxed spaces designed for guests of every age to enjoy together.",
+    title: "Aile Dostu",
+    description: "Her yaştan misafir için güvenli ve rahat geçen keyifli bir gün tasarlar.",
   },
   {
     number: "03",
-    title: "Space & Privacy",
-    description: "Generous grounds and private corners, never crowded or rushed.",
+    title: "Genişlik ve Mahremiyet",
+    description: "Sakin ve ferah alanlar, kalabalık hissi vermeden huzurlu bir deneyim sunar.",
   },
   {
     number: "04",
-    title: "Events & Experiences",
-    description: "Tents, open areas and activities ready to host your next celebration.",
+    title: "Etkinlikler ve Deneyimler",
+    description: "Çadırlar, açık alanlar ve aktiviteler, bir sonraki kutlamanızı hazırlamak için hazırdır.",
   },
 ];
 
@@ -25,9 +25,9 @@ export function WhyChamlija() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
       <div className="max-w-xl">
-        <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Why Chamlija</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Neden Chamlija</p>
         <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-          Made for unforgettable days
+            Unutulmaz günler için tasarlandı
         </h2>
       </div>
 

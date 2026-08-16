@@ -6,7 +6,7 @@ import { BookingProgress } from "@/components/booking/booking-progress";
 import { PicnicAreaSelector } from "@/components/booking/picnic-area-selector";
 import { checkBookingAvailability, DEFAULT_BUSINESS_HOURS } from "@/lib/booking/availability";
 import { samplePicnicAreas } from "@/lib/booking/picnic-areas";
-import { calculateEntranceTotal, calculateTotalVisitors, formatCurrency } from "@/lib/booking/pricing";
+import { PRICING, calculateEntranceTotal, calculateTotalVisitors, formatCurrency } from "@/lib/booking/pricing";
 import type { VisitorCounts } from "@/lib/booking/types";
 
 const initialVisitors: VisitorCounts = {
@@ -116,23 +116,24 @@ export default function BookingPage() {
       ? `Selected group size: ${totalVisitors} visitors.`
       : "Add visitors to see which picnic areas are available.";
 
-  const totalLabel = `${visitors.adults} Adults × R50, ${visitors.children3Plus} Children 3+ × R25, ${visitors.under3} Under 3 × R0`;
+  const totalLabel = `${visitors.adults} Adults × R${PRICING.adult}, ${visitors.children3Plus} Children 3+ × R${PRICING.child3Plus}, ${visitors.under3} Under 3 × R${PRICING.under3}`;
 
   return (
     <main className="min-h-screen bg-[#f7f3ea] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
-            ← Back to homepage
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-emerald-800">
+            <span aria-hidden="true">←</span>
+            Back to Home
           </Link>
           <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600">
-            Reservation request
+            Reservation Request
           </div>
         </div>
 
         <div className="mb-8 space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-700">Book a visit</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Create your reservation</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-700">Reservation</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Create a reservation</h1>
         </div>
 
         <BookingProgress currentStep={currentStep} />
@@ -142,8 +143,8 @@ export default function BookingPage() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Step 1</p>
-                  <h2 className="mt-2 text-2xl font-black text-slate-900">Choose your date and time</h2>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Adım 1</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-900">Tarih ve saati seçin</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -221,8 +222,8 @@ export default function BookingPage() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Step 2</p>
-                  <h2 className="mt-2 text-2xl font-black text-slate-900">Number of visitors</h2>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Adım 2</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-900">Ziyaretçi sayısı</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -262,8 +263,8 @@ export default function BookingPage() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Step 3</p>
-                  <h2 className="mt-2 text-2xl font-black text-slate-900">Select a picnic area</h2>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Adım 3</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-900">Piknik alanı seçin</h2>
                 </div>
 
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
@@ -291,7 +292,7 @@ export default function BookingPage() {
                 disabled={currentStep === 1}
                 className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Previous
+                Geri
               </button>
 
               <button
@@ -299,49 +300,49 @@ export default function BookingPage() {
                 onClick={goToNextStep}
                 className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
               >
-                {currentStep === 3 ? "Review reservation" : "Continue"}
+                {currentStep === 3 ? "Rezervasyonu İncele" : "Devam Et"}
               </button>
             </div>
           </section>
 
           <aside className="space-y-5">
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Booking summary</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Rezervasyon Özeti</p>
               <div className="mt-5 space-y-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Date</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tarih</p>
                   <p className="mt-1 text-base font-bold text-slate-900">
-                    {selectedDate ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "Not selected"}
+                    {selectedDate ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "Seçilmedi"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Arrival time</p>
-                  <p className="mt-1 text-base font-bold text-slate-900">{selectedTime || "Not selected"}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Varış Saati</p>
+                  <p className="mt-1 text-base font-bold text-slate-900">{selectedTime || "Seçilmedi"}</p>
                 </div>
 
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Visitors</p>
-                  <p className="mt-1 text-base font-bold text-slate-900">{totalVisitors || 0} total</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ziyaretçiler</p>
+                  <p className="mt-1 text-base font-bold text-slate-900">{totalVisitors || 0} toplam</p>
                 </div>
               </div>
             </div>
 
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Pricing</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Fiyatlandırma</p>
 
               <div className="mt-4 space-y-3 text-sm text-slate-700">
                 <div className="flex justify-between gap-4">
-                  <span>Adults × R50</span>
-                  <span>R{visitors.adults * 50}</span>
+                  <span>Adults × R{PRICING.adult}</span>
+                  <span>R{visitors.adults * PRICING.adult}</span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Children 3+ × R25</span>
-                  <span>R{visitors.children3Plus * 25}</span>
+                  <span>Children 3+ × R{PRICING.child3Plus}</span>
+                  <span>R{visitors.children3Plus * PRICING.child3Plus}</span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Children under 3 × R0</span>
-                  <span>R0</span>
+                  <span>Children under 3 × R{PRICING.under3}</span>
+                  <span>R{visitors.under3 * PRICING.under3}</span>
                 </div>
               </div>
 

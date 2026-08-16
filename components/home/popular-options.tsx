@@ -22,12 +22,12 @@ export function PopularOptions({ products }: { products: ProductRecord[] }) {
       <div className="max-w-xl">
         <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Popular Options</p>
         <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-          Loved by our guests
+          Guest favourites
         </h2>
       </div>
 
       {options.length === 0 ? (
-        <p className="mt-10 text-[#49574f]">Pricing will appear here once the catalog is available.</p>
+        <p className="mt-10 text-[#49574f]">Pricing will appear here once the catalog is ready.</p>
       ) : (
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {options.map((product) => {

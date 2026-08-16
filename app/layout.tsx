@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DecorativeLeaves } from "@/components/DecorativeLeaves";
+import { ChamlijaAIChat } from "@/components/site/chamlija-ai-chat";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +26,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="relative min-h-full flex flex-col font-sans" style={{ isolation: "isolate" }}>
+        <DecorativeLeaves />
+        <div className="site-content-shell">{children}</div>
+        <ChamlijaAIChat />
+      </body>
     </html>
   );
 }

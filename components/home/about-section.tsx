@@ -19,9 +19,9 @@ export function AboutSection() {
         </div>
 
         <div className="lg:pl-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Welcome to Chamlija</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Chamlija’ya Hoş Geldiniz</p>
           <h2 className="mt-4 text-3xl font-semibold leading-[1.06] tracking-[-0.04em] text-[#14251d] sm:text-4xl lg:text-[2.7rem]">
-            A place to slow down
+            Yavaşlamanın yeri
           </h2>
           <p className="mt-5 max-w-md text-base leading-7 text-[#49574f] sm:leading-8">
             Buyuk Chamlija brings together shaded picnic corners, open lawns and event spaces
@@ -33,7 +33,7 @@ export function AboutSection() {
             href="#experiences"
             className="mt-8 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[#14251d] transition hover:text-[#7a8462]"
           >
-            Discover the grounds
+            Araziyi Keşfet
             <span aria-hidden="true">→</span>
           </Link>
         </div>

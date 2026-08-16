@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isValidBookingTime } from "@/lib/booking/hours";
-
-const ADULT_FEE = 50;
-const CHILD_3_PLUS_FEE = 25;
-const FREE_CHILD_PRICE = 0;
+import { calculateBookingPriceBreakdown, parseSelectedEquipmentQuantities } from "@/lib/booking/pricing";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 function parseNonNegativeInteger(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : 0;
-}
-
-function computeEntranceFee(adults: number, children3Plus: number, childrenUnder3: number): number {
-  return adults * ADULT_FEE + children3Plus * CHILD_3_PLUS_FEE + childrenUnder3 * FREE_CHILD_PRICE;
 }
 
 export async function POST(request: Request) {
@@ -33,14 +26,9 @@ export async function POST(request: Request) {
     const selectedEquipmentIds = Array.isArray(body.selected_equipment_ids)
       ? body.selected_equipment_ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
       : [];
-    
-    // Parse equipment quantities from "id:qty" format
-    const equipmentWithQty = selectedEquipmentIds.map((item: string) => {
-      const [id, qtyStr] = item.split(":");
-      const qty = Number(qtyStr) || 1;
-      return { id: id.trim(), qty };
-    });
-    
+
+    const equipmentQuantities = parseSelectedEquipmentQuantities(selectedEquipmentIds);
+
     const selectedPaidActivityId = typeof body.selected_paid_activity_id === "string" ? body.selected_paid_activity_id.trim() : null;
     const selectedTentAreaId = typeof body.selected_tent_area_id === "string" ? body.selected_tent_area_id.trim() : null;
     const selectedPhotoShootId = typeof body.selected_photo_shoot_id === "string" ? body.selected_photo_shoot_id.trim() : null;
@@ -92,21 +80,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The selected picnic area cannot accommodate your party size." }, { status: 400 });
     }
 
-    let additionalTotal = Number(area.price ?? 0);
-
     const selectedProductIds = [
-      ...equipmentWithQty.map((e: { id: string; qty: number }) => e.id),
+      ...Object.keys(equipmentQuantities),
       selectedPaidActivityId,
       selectedTentAreaId,
       selectedPhotoShootId,
     ].filter((id): id is string => typeof id === "string" && Boolean(id.trim()));
 
     const productIds = [...new Set(selectedProductIds)];
-
     const validatedProductIds: string[] = [];
 
+    let products: Array<{ id: string; price: number | null; category: string | null; is_free?: boolean | null; is_active?: boolean | null; is_bookable?: boolean | null }> = [];
+
     if (productIds.length > 0) {
-      const { data: products, error: productsError } = await supabaseAdmin
+      const { data: fetchedProducts, error: productsError } = await supabaseAdmin
         .from("products")
         .select("*")
         .in("id", productIds)
@@ -118,53 +105,51 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: productsError.message }, { status: 500 });
       }
 
-      const productMap = new Map((products ?? []).map((product) => [product.id, product]));
-
-      // Handle equipment with quantities
-      for (const { id: equipmentId, qty } of equipmentWithQty) {
-        const product = productMap.get(equipmentId);
-
-        if (!product) {
-          return NextResponse.json({ error: "One or more selected products are invalid or unavailable." }, { status: 400 });
-        }
-
-        if (product.is_free === true) {
-          continue;
-        }
-
-        if (product.category !== "equipment") {
-          return NextResponse.json({ error: "One or more selected equipment items belong to an invalid category." }, { status: 400 });
-        }
-
-        validatedProductIds.push(equipmentId);
-        additionalTotal += Number(product.price ?? 0) * qty;
-      }
-
-      // Handle single-select products (paid activity, tent area, photo shoot)
-      for (const productId of [selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId]) {
-        if (!productId) continue;
-
-        const product = productMap.get(productId);
-
-        if (!product) {
-          return NextResponse.json({ error: "One or more selected products are invalid or unavailable." }, { status: 400 });
-        }
-
-        if (product.is_free === true) {
-          continue;
-        }
-
-        if (product.category !== "paid_activity" && product.category !== "tent_event_area" && product.category !== "photo_shoot") {
-          return NextResponse.json({ error: "One or more selected products belong to an invalid category." }, { status: 400 });
-        }
-
-        validatedProductIds.push(productId);
-        additionalTotal += Number(product.price ?? 0);
-      }
+      products = fetchedProducts ?? [];
     }
 
-    const entranceFeeTotal = computeEntranceFee(adults, children3Plus, childrenUnder3);
-    const finalTotal = entranceFeeTotal + additionalTotal;
+    const productMap = new Map(products.map((product) => [product.id, product]));
+
+    for (const [equipmentId, qty] of Object.entries(equipmentQuantities)) {
+      const product = productMap.get(equipmentId);
+      if (!product) {
+        return NextResponse.json({ error: "One or more selected products are invalid or unavailable." }, { status: 400 });
+      }
+      if (product.is_free === true || product.category !== "equipment") {
+        continue;
+      }
+      validatedProductIds.push(equipmentId);
+    }
+
+    for (const productId of [selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId]) {
+      if (!productId) continue;
+
+      const product = productMap.get(productId);
+      if (!product) {
+        return NextResponse.json({ error: "One or more selected products are invalid or unavailable." }, { status: 400 });
+      }
+      if (product.is_free === true) {
+        continue;
+      }
+      if (product.category !== "paid_activity" && product.category !== "tent_event_area" && product.category !== "photo_shoot") {
+        return NextResponse.json({ error: "One or more selected products belong to an invalid category." }, { status: 400 });
+      }
+      validatedProductIds.push(productId);
+    }
+
+    const finalBreakdown = calculateBookingPriceBreakdown({
+      adults,
+      children3Plus,
+      childrenUnder3,
+      selectedArea: area,
+      equipmentQuantities,
+      products: productMap.size > 0 ? Array.from(productMap.values()) as any : [],
+      selectedPaidActivityId,
+      selectedTentAreaId,
+      selectedPhotoShootId,
+    });
+
+    const finalTotal = finalBreakdown.total;
 
     const { data: conflictingBookings, error: conflictError } = await supabaseAdmin
       .from("bookings")
@@ -222,8 +207,8 @@ export async function POST(request: Request) {
       selected_paid_activity_id: selectedPaidActivityId || null,
       selected_tent_area_id: selectedTentAreaId || null,
       selected_photo_shoot_id: selectedPhotoShootId || null,
-      entrance_fee_total: entranceFeeTotal,
-      additional_total: additionalTotal,
+      entrance_fee_total: finalBreakdown.entranceFeeTotal,
+      additional_total: finalBreakdown.additionalTotal,
       total_price: finalTotal,
       booking_status: "pending",
       payment_status: "pending",

@@ -75,20 +75,43 @@ function PaymentContent() {
     };
   }, [bookingId]);
 
+  const totalFormatter = new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency: "ZAR",
+    maximumFractionDigits: 0,
+  });
+
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Payment</p>
+    <main className="booking-ui min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.04)] sm:p-8">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:translate-y-px"
+          >
+            <span aria-hidden="true">←</span>
+            Back to Home
+          </Link>
+        </div>
+
+        <p className="text-sm font-semibold tracking-[0.18em] text-emerald-700">PAYMENT</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">
-          {state.loading ? "Preparing your payment" : state.error ? "Payment is not available yet" : "Continue to secure payment"}
+          {state.loading ? "Preparing your payment" : state.error ? "Payment is currently unavailable" : "Continue to secure payment"}
         </h1>
         <p className="mt-4 text-base leading-7 text-slate-600">
           {state.loading
-            ? "We are creating your secure checkout session and will redirect you to the payment page in a moment."
+            ? "Your secure payment session is being prepared. You will be redirected shortly."
             : state.error
               ? state.error
-              : "Your booking is reserved and ready for payment. Please continue to the secure iKhokha checkout to complete your purchase."}
+              : "Your reservation is confirmed and ready for payment. Please continue to the secure iKhokha payment page to complete your booking."}
         </p>
+
+        {state.total !== null && (
+          <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Total Amount</div>
+            <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{totalFormatter.format(state.total)}</div>
+          </div>
+        )}
 
         {bookingId && (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -106,12 +129,16 @@ function PaymentContent() {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <a
               href={state.redirectUrl}
-              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800"
             >
-              Continue to payment
+              Continue to Payment
             </a>
-            <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
-              Return home
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+            >
+              <span aria-hidden="true">←</span>
+              Back to Home
             </Link>
           </div>
         )}
@@ -119,10 +146,11 @@ function PaymentContent() {
         {!state.loading && !state.redirectUrl && !state.error && bookingId && (
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/book" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
-              Back to booking
+              Return to Reservation
             </Link>
-            <Link href="/" className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800">
-              Return home
+            <Link href="/" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+              <span aria-hidden="true">←</span>
+              Back to Home
             </Link>
           </div>
         )}
@@ -130,10 +158,11 @@ function PaymentContent() {
         {!state.loading && state.error && (
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/book" className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800">
-              Book again
+              Make Another Reservation
             </Link>
-            <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
-              Return home
+            <Link href="/" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+              <span aria-hidden="true">←</span>
+              Back to Home
             </Link>
           </div>
         )}

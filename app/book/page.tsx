@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ProductRecord } from "@/lib/products/types";
 import { BOOKING_TIME_SLOTS } from "@/lib/booking/hours";
+import { calculateBookingPriceBreakdown, formatCurrency } from "@/lib/booking/pricing";
 
 const initialForm = {
   fullName: "",
@@ -90,12 +91,33 @@ export default function BookingPage() {
   const childrenUnder3 = Number(form.childrenUnder3 || 0);
   const totalGuests = adults + children3Plus + childrenUnder3;
 
-  const entranceFeeTotal = useMemo(() => adults * 50 + children3Plus * 25, [adults, children3Plus]);
-
   const picnicAreas = useMemo(
     () => products.filter((product) => product.category === "picnic_area" && product.is_active && product.is_bookable),
     [products],
   );
+
+  const selectedArea = useMemo(
+    () => picnicAreas.find((area) => area.id === form.picnicAreaId) ?? null,
+    [form.picnicAreaId, picnicAreas],
+  );
+
+  const bookingPriceBreakdown = useMemo(
+    () =>
+      calculateBookingPriceBreakdown({
+        adults,
+        children3Plus,
+        childrenUnder3,
+        selectedArea,
+        equipmentQuantities,
+        products,
+        selectedPaidActivityId,
+        selectedTentAreaId,
+        selectedPhotoShootId,
+      }),
+    [adults, children3Plus, childrenUnder3, selectedArea, equipmentQuantities, products, selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId],
+  );
+
+  const entranceFeeTotal = bookingPriceBreakdown.entranceFeeTotal;
 
   const freeActivities = useMemo(
     () => products.filter((product) => product.category === "free_activity" && product.is_active),
@@ -116,67 +138,8 @@ export default function BookingPage() {
     [products],
   );
 
-  const bookingSummaryData = useMemo(() => {
-    let additionalTotal = 0;
-    const lineItems: Array<{ label: string; quantity: number; unitPrice: number; total: number }> = [];
-
-    // Selected picnic area
-    const selectedArea = picnicAreas.find((area) => area.id === form.picnicAreaId);
-    if (selectedArea) {
-      additionalTotal += Number(selectedArea.price ?? 0);
-    }
-
-    // Equipment with quantities
-    Object.entries(equipmentQuantities).forEach(([equipmentId, qty]) => {
-      if (qty > 0) {
-        const equipment = products.find((p) => p.id === equipmentId);
-        if (equipment) {
-          const unitPrice = Number(equipment.price ?? 0);
-          const lineTotal = unitPrice * qty;
-          additionalTotal += lineTotal;
-          lineItems.push({
-            label: equipment.name,
-            quantity: qty,
-            unitPrice,
-            total: lineTotal,
-          });
-        }
-      }
-    });
-
-    // Paid activity
-    if (selectedPaidActivityId) {
-      const paidActivity = products.find((p) => p.id === selectedPaidActivityId);
-      if (paidActivity) {
-        additionalTotal += Number(paidActivity.price ?? 0);
-      }
-    }
-
-    // Tent/event area
-    if (selectedTentAreaId) {
-      const tentArea = products.find((p) => p.id === selectedTentAreaId);
-      if (tentArea) {
-        additionalTotal += Number(tentArea.price ?? 0);
-      }
-    }
-
-    // Photo shoot
-    if (selectedPhotoShootId) {
-      const photoShoot = products.find((p) => p.id === selectedPhotoShootId);
-      if (photoShoot) {
-        additionalTotal += Number(photoShoot.price ?? 0);
-      }
-    }
-
-    return { additionalTotal, lineItems };
-  }, [form.picnicAreaId, equipmentQuantities, selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId, products, picnicAreas]);
-
-  const priceTotal = entranceFeeTotal + bookingSummaryData.additionalTotal;
-
-  const selectedArea = useMemo(
-    () => picnicAreas.find((area) => area.id === form.picnicAreaId) ?? null,
-    [form.picnicAreaId, picnicAreas],
-  );
+  const bookingSummaryData = bookingPriceBreakdown;
+  const priceTotal = bookingSummaryData.total;
 
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -405,20 +368,24 @@ export default function BookingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-3 py-6 text-charcoal sm:px-6 lg:px-8 lg:py-10">
+    <main className="booking-ui min-h-screen bg-cream px-3 py-6 text-charcoal sm:px-6 lg:px-8 lg:py-10">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/" className="text-sm font-semibold text-forest transition hover:text-terracotta">
-            ← Back to homepage
+          <Link
+            href="/"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-forest/15 bg-white px-4 py-2.5 text-sm font-semibold text-forest shadow-sm transition hover:border-forest/30 hover:bg-forest/5 hover:text-terracotta active:translate-y-px active:shadow-none"
+          >
+            <span aria-hidden="true" className="text-base leading-none">←</span>
+            <span>Back to Home</span>
           </Link>
           <div className="self-start rounded-full border border-forest/15 bg-white px-3 py-1.5 text-sm font-medium text-charcoal/60 sm:self-auto">
-            Customer booking
+            Customer Reservation
           </div>
         </div>
 
         <div className="mb-8 space-y-2 sm:mb-10">
-          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-terracotta sm:text-xs">Book your visit</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-forest-dark sm:text-3xl lg:text-4xl">Plan your day at Buyuk Chamlija</h1>
+          <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-terracotta sm:text-xs">Reservation</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-forest-dark sm:text-3xl lg:text-4xl">Create a reservation for Buyuk Chamlija</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:gap-8">
@@ -426,7 +393,7 @@ export default function BookingPage() {
             <div className="space-y-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">Customer Information</p>
-                <h2 className="mt-2 text-2xl font-semibold text-forest-dark">Your details</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-forest-dark">Your Details</h2>
               </div>
 
               <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
@@ -470,13 +437,13 @@ export default function BookingPage() {
 
               <div className="space-y-6 border-t border-forest/10 pt-8">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">Visit Details</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-forest-dark">Your visit</h2>
+                  <p className="text-xs font-medium tracking-[0.22em] text-terracotta">VISIT DETAILS</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-forest-dark">Visit Details</h2>
                 </div>
 
                 <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
                   <div>
-                    <label htmlFor="bookingDate" className="mb-2 block text-sm font-semibold text-charcoal/80">Booking Date</label>
+                    <label htmlFor="bookingDate" className="mb-2 block text-sm font-semibold text-charcoal/80">Reservation Date</label>
                     <input
                       id="bookingDate"
                       type="date"
@@ -489,7 +456,7 @@ export default function BookingPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="bookingTime" className="mb-2 block text-sm font-semibold text-charcoal/80">Booking Time</label>
+                    <label htmlFor="bookingTime" className="mb-2 block text-sm font-semibold text-charcoal/80">Arrival Time</label>
                     <select
                       id="bookingTime"
                       value={form.bookingTime}
@@ -505,9 +472,9 @@ export default function BookingPage() {
 
                 <div className="grid gap-4 sm:gap-5 md:grid-cols-3">
                   {[
-                    ["adults", "Number of Adults"],
-                    ["children3Plus", "Number of Children (3+)"],
-                    ["childrenUnder3", "Number of Children Under 3"],
+                    ["adults", "Adults"],
+                    ["children3Plus", "Children 3+"],
+                    ["childrenUnder3", "Children Under 3"],
                   ].map(([key, label]) => (
                     <div key={key}>
                       <label htmlFor={key} className="mb-2 block text-sm font-semibold text-charcoal/80">{label}</label>
@@ -557,16 +524,16 @@ export default function BookingPage() {
 
                 <div className="space-y-6 pt-2">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">Add-ons</p>
-                    <h3 className="mt-2 text-xl font-semibold text-forest-dark">Choose your extras</h3>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">Additional Options</p>
+                    <h3 className="mt-2 text-xl font-semibold text-forest-dark">Select your add-ons</h3>
                   </div>
 
                   {paidProductGroups.map((group) => (
                     <div key={group.category} className="border border-forest/10 bg-cream/40 p-5">
-                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-charcoal/60">{group.label}</p>
+                      <p className="mb-3 text-xs font-medium tracking-[0.2em] text-charcoal/60">{group.label}</p>
 
                       {group.items.length === 0 ? (
-                        <p className="text-sm text-charcoal/50">No {group.label.toLowerCase()} available right now.</p>
+                        <p className="text-sm text-charcoal/50">No {group.label.toLowerCase()} are currently available.</p>
                       ) : group.category === "equipment" ? (
                         <div className="space-y-3">
                           {group.items.map((item) => {
@@ -586,7 +553,8 @@ export default function BookingPage() {
                                         [item.id]: Math.max(0, (current[item.id] || 0) - 1),
                                       }))
                                     }
-                                    className="flex h-10 w-10 items-center justify-center rounded-full border border-forest/20 text-lg font-bold text-forest transition hover:bg-forest/10"
+                                    disabled={qty === 0}
+                                    className="flex h-10 w-10 items-center justify-center rounded-full border border-forest/20 text-lg font-bold text-forest transition hover:bg-forest/10 disabled:cursor-not-allowed disabled:border-forest/10 disabled:text-charcoal/35"
                                   >
                                     −
                                   </button>
@@ -599,7 +567,7 @@ export default function BookingPage() {
                                         [item.id]: (current[item.id] || 0) + 1,
                                       }))
                                     }
-                                    className="flex h-10 w-10 items-center justify-center rounded-full bg-forest text-lg font-bold text-white transition hover:bg-forest-dark"
+                                    className="flex h-10 w-10 items-center justify-center rounded-full bg-forest text-lg font-bold text-white transition hover:bg-forest-dark active:scale-[0.98]"
                                   >
                                     +
                                   </button>
@@ -638,7 +606,7 @@ export default function BookingPage() {
 
                   {freeActivities.length > 0 && (
                     <div className="border border-olive/25 bg-olive/5 p-5">
-                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-olive">Free Activities</p>
+                      <p className="mb-3 text-xs font-medium tracking-[0.2em] text-olive">Free Activities</p>
                       <div className="space-y-2 text-sm text-charcoal/70">
                         {freeActivities.map((item) => (
                           <div key={item.id} className="flex items-center justify-between gap-3 border border-olive/15 bg-white px-4 py-2.5">
@@ -667,10 +635,10 @@ export default function BookingPage() {
                 <button
                   type="button"
                   onClick={checkAvailability}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-forest px-6 py-3 text-sm font-bold uppercase tracking-[0.1em] text-white shadow-lg shadow-forest/20 transition hover:bg-forest-dark disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-forest px-6 py-3 text-sm font-semibold tracking-[0.08em] text-white shadow-lg shadow-forest/20 transition hover:bg-forest-dark disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={availabilityState.checking}
                 >
-                  {availabilityState.checking ? "Checking availability..." : "Check availability"}
+                  {availabilityState.checking ? "Checking availability..." : "Check Availability"}
                 </button>
 
                 {availabilityState.message && (
@@ -681,7 +649,7 @@ export default function BookingPage() {
 
                 {availabilityState.availableSlots.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-sm font-semibold text-charcoal/70">Here are the available time slots.</p>
+                    <p className="text-sm font-semibold text-charcoal/70">Available times:</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {availabilityState.availableSlots.map((slot) => (
                         <button
@@ -727,113 +695,111 @@ export default function BookingPage() {
           </section>
 
           <aside className="space-y-5">
-            <div className="border border-forest/10 bg-white p-4 shadow-[0_18px_40px_rgba(20,37,29,0.05)] sm:p-6">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-terracotta sm:text-xs">Booking Summary</p>
+            <div className="rounded-[1.75rem] border border-forest/10 bg-white p-4 shadow-[0_18px_40px_rgba(20,37,29,0.05)] sm:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="text-[10px] font-medium tracking-[0.22em] text-terracotta sm:text-xs">Reservation Summary</p>
+                <span className="rounded-full bg-forest/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-forest">Total</span>
+              </div>
 
-              <div className="mt-5 space-y-4 text-sm text-charcoal/75">
-                {/* Guest counts */}
-                <div className="space-y-2 border-b border-forest/10 pb-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Entrance Fees</p>
-                  {adults > 0 && <div className="flex justify-between gap-3 text-sm"><span className="break-words">Adults × {adults}</span><span className="shrink-0">ZAR {(adults * 50).toLocaleString()}</span></div>}
-                  {children3Plus > 0 && <div className="flex justify-between gap-3 text-sm"><span className="break-words">Children 3+ × {children3Plus}</span><span className="shrink-0">ZAR {(children3Plus * 25).toLocaleString()}</span></div>}
-                  {childrenUnder3 > 0 && <div className="flex justify-between gap-3 text-sm"><span className="break-words">Children under 3 × {childrenUnder3}</span><span className="shrink-0">Free</span></div>}
-                  {totalGuests === 0 && <div className="text-xs italic text-charcoal/40">No guests selected</div>}
+              <div className="space-y-4 text-sm text-charcoal/75">
+                <div className="rounded-2xl border border-forest/10 bg-cream/30 p-3">
+                  <p className="mb-2 text-[10px] font-medium tracking-[0.18em] text-charcoal/50 sm:text-xs">Guests</p>
+                  {adults > 0 && (
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span>{adults} Adult{adults === 1 ? "" : "s"}</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.adultTotal)}</span>
+                    </div>
+                  )}
+                  {children3Plus > 0 && (
+                    <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                      <span>{children3Plus} Child{children3Plus === 1 ? "" : "ren"} 3+</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.child3PlusTotal)}</span>
+                    </div>
+                  )}
+                  {childrenUnder3 > 0 && (
+                    <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                      <span>{childrenUnder3} Child{childrenUnder3 === 1 ? "" : "ren"} under 3</span>
+                      <span className="font-semibold text-forest-dark">Free</span>
+                    </div>
+                  )}
+                  {totalGuests === 0 && <div className="text-xs italic text-charcoal/40">No guests selected yet</div>}
                 </div>
 
-                {/* Picnic area */}
-                {form.picnicAreaId && (
-                  <div className="space-y-2 border-b border-forest/10 pb-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Picnic Area</p>
-                    {picnicAreas.find((a) => a.id === form.picnicAreaId) && (
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="break-words">{picnicAreas.find((a) => a.id === form.picnicAreaId)?.name}</span>
-                        <span className="shrink-0">ZAR {Number(picnicAreas.find((a) => a.id === form.picnicAreaId)?.price ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
+                {selectedArea && (
+                  <div className="rounded-2xl border border-forest/10 bg-cream/30 p-3">
+                    <p className="mb-2 text-[10px] font-medium tracking-[0.18em] text-charcoal/50 sm:text-xs">Picnic Area</p>
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="break-words font-medium text-forest-dark">{selectedArea.name}</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.areaTotal)}</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Equipment */}
-                {Object.entries(equipmentQuantities).some(([, qty]) => qty > 0) && (
-                  <div className="space-y-2 border-b border-forest/10 pb-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Equipment</p>
-                    {Object.entries(equipmentQuantities).map(([equipmentId, qty]) => {
-                      if (qty === 0) return null;
-                      const equipment = products.find((p) => p.id === equipmentId);
-                      if (!equipment) return null;
-                      const unitPrice = Number(equipment.price ?? 0);
-                      const lineTotal = unitPrice * qty;
-                      return (
-                        <div key={equipmentId} className="space-y-1">
-                          <div className="flex justify-between gap-3 text-xs">
-                            <span className="break-words">{equipment.name}</span>
-                            <span className="shrink-0">ZAR {unitPrice.toLocaleString()} × {qty}</span>
+                {bookingPriceBreakdown.lineItems.filter((item) => item.kind === "equipment").length > 0 && (
+                  <div className="rounded-2xl border border-forest/10 bg-cream/30 p-3">
+                    <p className="mb-2 text-[10px] font-medium tracking-[0.18em] text-charcoal/50 sm:text-xs">Equipment</p>
+                    <div className="space-y-3">
+                      {bookingPriceBreakdown.lineItems
+                        .filter((item) => item.kind === "equipment")
+                        .map((item) => (
+                          <div key={item.label} className="rounded-xl border border-forest/10 bg-white p-2.5">
+                            <div className="flex items-start justify-between gap-3 text-xs">
+                              <span className="break-words font-medium text-forest-dark">{item.label}</span>
+                              <span className="shrink-0 font-semibold text-forest-dark">{formatCurrency(item.total)}</span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-3 text-xs text-charcoal/60">
+                              <span>{item.quantity} × {formatCurrency(item.unitPrice)}</span>
+                              <span className="font-medium">{formatCurrency(item.total)}</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between gap-3 pl-4 font-semibold text-forest-dark">
-                            <span></span>
-                            <span className="shrink-0">ZAR {lineTotal.toLocaleString()}</span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {bookingPriceBreakdown.lineItems.filter((item) => item.kind === "single-item").length > 0 && (
+                  <div className="rounded-2xl border border-forest/10 bg-cream/30 p-3">
+                    <p className="mb-2 text-[10px] font-medium tracking-[0.18em] text-charcoal/50 sm:text-xs">Services</p>
+                    <div className="space-y-2">
+                      {bookingPriceBreakdown.lineItems
+                        .filter((item) => item.kind === "single-item")
+                        .map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="break-words font-medium text-forest-dark">{item.label}</span>
+                            <span className="font-semibold text-forest-dark">{formatCurrency(item.total)}</span>
                           </div>
-                        </div>
-                      );
-                    })}
+                        ))}
+                    </div>
                   </div>
                 )}
 
-                {/* Paid activity */}
-                {selectedPaidActivityId && (
-                  <div className="space-y-2 border-b border-forest/10 pb-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Paid Activity</p>
-                    {products.find((p) => p.id === selectedPaidActivityId) && (
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="break-words">{products.find((p) => p.id === selectedPaidActivityId)?.name}</span>
-                        <span className="shrink-0">ZAR {Number(products.find((p) => p.id === selectedPaidActivityId)?.price ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Tent/event area */}
-                {selectedTentAreaId && (
-                  <div className="space-y-2 border-b border-forest/10 pb-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Tent & Event Area</p>
-                    {products.find((p) => p.id === selectedTentAreaId) && (
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="break-words">{products.find((p) => p.id === selectedTentAreaId)?.name}</span>
-                        <span className="shrink-0">ZAR {Number(products.find((p) => p.id === selectedTentAreaId)?.price ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Photo shoot */}
-                {selectedPhotoShootId && (
-                  <div className="space-y-2 border-b border-forest/10 pb-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-charcoal/50 sm:text-xs">Photo Shoot</p>
-                    {products.find((p) => p.id === selectedPhotoShootId) && (
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="break-words">{products.find((p) => p.id === selectedPhotoShootId)?.name}</span>
-                        <span className="shrink-0">ZAR {Number(products.find((p) => p.id === selectedPhotoShootId)?.price ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Totals */}
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 rounded-2xl border border-forest/10 bg-forest/5 p-3">
                   <div className="flex justify-between gap-3 text-sm">
-                    <span>Entrance Fee Total</span>
-                    <span className="shrink-0 font-semibold text-forest-dark">ZAR {entranceFeeTotal.toLocaleString()}</span>
+                    <span>Entrance Fees</span>
+                    <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.entranceFeeTotal)}</span>
                   </div>
-                  {bookingSummaryData.additionalTotal > 0 && (
+                  {bookingPriceBreakdown.areaTotal > 0 && (
                     <div className="flex justify-between gap-3 text-sm">
-                      <span>Additional Products</span>
-                      <span className="shrink-0 font-semibold text-forest-dark">ZAR {bookingSummaryData.additionalTotal.toLocaleString()}</span>
+                      <span>Picnic Area</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.areaTotal)}</span>
+                    </div>
+                  )}
+                  {bookingPriceBreakdown.equipmentTotal > 0 && (
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span>Equipment</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.equipmentTotal)}</span>
+                    </div>
+                  )}
+                  {bookingPriceBreakdown.singleItemTotal > 0 && (
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span>Services</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.singleItemTotal)}</span>
                     </div>
                   )}
                   <div className="border-t border-forest/15 pt-3">
                     <div className="flex items-center justify-between text-base font-bold text-forest-dark sm:text-lg">
-                      <span>TOTAL</span>
-                      <span>ZAR {priceTotal.toLocaleString()}</span>
+                      <span>Total</span>
+                      <span>{formatCurrency(bookingPriceBreakdown.total)}</span>
                     </div>
                   </div>
                 </div>

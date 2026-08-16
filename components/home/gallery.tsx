@@ -51,9 +51,9 @@ export function Gallery() {
       <div className="mx-auto max-w-6xl">
         <div className="flex items-end justify-between gap-4">
           <div className="max-w-xl">
-            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Gallery</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Galeri</p>
             <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-              A glimpse of Chamlija
+              Chamlija’dan bir bakış
             </h2>
           </div>
 

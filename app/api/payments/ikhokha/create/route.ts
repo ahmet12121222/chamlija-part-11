@@ -23,7 +23,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The booking could not be found." }, { status: 404 });
     }
 
-    const trustedAmount = Number(booking.total_price ?? 0);
+    const summary = await getBookingPaymentSummary(bookingId);
+    if (!summary) {
+      return NextResponse.json({ error: "Unable to load booking payment details." }, { status: 404 });
+    }
+
+    const trustedAmount = Number(summary?.total_price ?? booking.total_price ?? 0);
     const trustedAmountInCents = toCents(trustedAmount);
 
     if (!Number.isFinite(trustedAmount) || trustedAmount <= 0) {
@@ -32,11 +37,6 @@ export async function POST(request: Request) {
 
     if (booking.payment_status === "paid" || booking.booking_status === "confirmed") {
       return NextResponse.json({ error: "This booking has already been paid for." }, { status: 409 });
-    }
-
-    const summary = await getBookingPaymentSummary(bookingId);
-    if (!summary) {
-      return NextResponse.json({ error: "Unable to load booking payment details." }, { status: 404 });
     }
 
     const { data: existingPayment } = await supabaseAdmin
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
         success: true,
         bookingId,
         paymentId: existingPayment.provider_payment_id ?? existingPayment.id ?? null,
+        totalPrice: trustedAmount,
         checkoutUrl: null,
         redirectUrl: null,
         providerConfigured: false,
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
         success: true,
         bookingId,
         paymentId: checkout.paymentId ?? paymentRecord?.id ?? null,
+        totalPrice: trustedAmount,
         externalTransactionId: checkout.externalTransactionId ?? externalTransactionId,
         checkoutUrl: checkout.checkoutUrl,
         redirectUrl: checkout.redirectUrl ?? checkout.checkoutUrl,

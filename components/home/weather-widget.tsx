@@ -19,7 +19,7 @@ export function WeatherWidget() {
         setWeather(data);
       } catch (err) {
         console.error("Failed to fetch weather:", err);
-        setError("Hava durumu şu anda alınamıyor.");
+        setError("Weather information is currently unavailable.");
       } finally {
         setLoading(false);
       }
@@ -28,10 +28,17 @@ export function WeatherWidget() {
     fetchWeather();
   }, []);
 
+  const skyBackground = "radial-gradient(circle at top left, rgba(213, 234, 249, 0.9) 0%, rgba(248, 252, 255, 0.9) 18%, rgba(230, 240, 252, 0.82) 34%, rgba(255, 255, 255, 0.88) 50%, rgba(245, 239, 221, 0.8) 74%, rgba(255, 249, 240, 0.9) 100%)";
+
   if (error) {
     return (
-      <section className="scroll-mt-24 bg-gradient-to-b from-[#f5f2ec] via-[#efe9e1] to-[#e8dfd4] px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
-        <div className="mx-auto max-w-6xl">
+      <section className="relative scroll-mt-24 overflow-hidden px-4 py-16 sm:px-8 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-12 top-12 h-52 w-52 rounded-full bg-[#d9f0ff]/60 blur-3xl" />
+          <div className="absolute right-0 top-24 h-64 w-64 rounded-full bg-[#f9e7a7]/30 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-[#dff2d8]/25 blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-6xl">
           <div className="rounded-2xl border border-[#14251d]/10 bg-white/50 p-8 text-center backdrop-blur-sm">
             <p className="text-sm text-[#49574f]">{error}</p>
           </div>
@@ -42,8 +49,13 @@ export function WeatherWidget() {
 
   if (loading || !weather) {
     return (
-      <section className="scroll-mt-24 bg-gradient-to-b from-[#f5f2ec] via-[#efe9e1] to-[#e8dfd4] px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
-        <div className="mx-auto max-w-6xl animate-pulse">
+      <section className="relative scroll-mt-24 overflow-hidden px-4 py-16 sm:px-8 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-12 top-12 h-52 w-52 rounded-full bg-[#d9f0ff]/60 blur-3xl" />
+          <div className="absolute right-0 top-24 h-64 w-64 rounded-full bg-[#f9e7a7]/30 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-[#dff2d8]/25 blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-6xl animate-pulse">
           <div className="h-8 w-64 rounded-lg bg-[#14251d]/10"></div>
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
             <div className="h-32 rounded-2xl bg-[#14251d]/10"></div>
@@ -63,7 +75,13 @@ export function WeatherWidget() {
     suitability.level === "excellent" ? "🟢" : suitability.level === "good" ? "🟡" : suitability.level === "caution" ? "🟠" : "🔴";
 
   return (
-    <section id="weather" className="scroll-mt-24 bg-gradient-to-b from-[#f5f2ec] via-[#efe9e1] to-[#e8dfd4] px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
+    <section id="weather" className="relative scroll-mt-24 overflow-hidden px-4 py-16 sm:px-8 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-8 top-10 h-56 w-56 rounded-full bg-[#dfeffc]/75 blur-3xl" />
+        <div className="absolute right-14 top-16 h-72 w-72 rounded-full bg-[#fbe6a3]/25 blur-3xl" />
+        <div className="absolute bottom-4 left-1/4 h-64 w-64 rounded-full bg-[#d9f1d1]/25 blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 h-52 w-52 rounded-full bg-[#d9edff]/30 blur-3xl" />
+      </div>
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(15px); }
@@ -82,20 +100,20 @@ export function WeatherWidget() {
         .weather-card:nth-child(7) { animation-delay: 0.7s; }
       `}</style>
 
-      <div className="mx-auto max-w-6xl">
+      <div className="relative mx-auto max-w-6xl">
         <div className="mb-12">
-          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Hava Durumu</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Weather</p>
           <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-            Bugün Chamlija'da hava nasıl?
+            What is the weather like at Chamlija today?
           </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-[#49574f]">Ziyaretinizi planlamadan önce hava durumuna göz atın.</p>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[#49574f]">Check the weather before planning your visit.</p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Current Weather */}
           <div className="lg:col-span-1">
             <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">Bugün</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">Today</p>
               <div className="mt-4 text-5xl">{currentWeather.icon}</div>
               <div className="mt-4">
                 <div className="text-4xl font-bold text-[#14251d]">{weather.current.temperature}°</div>
@@ -103,19 +121,19 @@ export function WeatherWidget() {
               </div>
               <div className="mt-6 space-y-2 border-t border-[#14251d]/10 pt-4 text-xs text-[#49574f]">
                 <div className="flex justify-between">
-                  <span>Hissedilen</span>
+                  <span>Feels like</span>
                   <span className="font-medium text-[#14251d]">{weather.current.apparentTemperature}°</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Nem</span>
+                  <span>Humidity</span>
                   <span className="font-medium text-[#14251d]">{weather.current.humidity}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Rüzgar</span>
-                  <span className="font-medium text-[#14251d]">{weather.current.windSpeed} km/s</span>
+                  <span>Wind</span>
+                  <span className="font-medium text-[#14251d]">{weather.current.windSpeed} km/h</span>
                 </div>
               </div>
-              <div className="mt-4 pt-4 text-[10px] text-[#49574f]/60">Son güncelleme: {weather.lastUpdated}</div>
+              <div className="mt-4 pt-4 text-[10px] text-[#49574f]/60">Last updated: {weather.lastUpdated}</div>
             </div>
           </div>
 
@@ -123,7 +141,7 @@ export function WeatherWidget() {
           <div className="lg:col-span-1">
             <div className="space-y-6">
               <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">UV İNDEKSİ</p>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">UV INDEX</p>
                 <div className="mt-4 flex items-baseline gap-3">
                   <div className="text-4xl font-bold text-[#14251d]">{weather.current.uvIndex}</div>
                   <span className="text-sm text-[#49574f]">{uvLevel}</span>
@@ -131,10 +149,10 @@ export function WeatherWidget() {
                 <p className="mt-3 text-xs leading-5 text-[#49574f]">{getUVAdvice(weather.current.uvIndex)}</p>
               </div>
               <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">YAĞIŞ İHTİMALİ</p>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">RAIN CHANCE</p>
                 <div className="mt-4">
                   <div className="text-3xl font-bold text-[#14251d]">{weather.daily[0].precipitationProbability}%</div>
-                  <p className="mt-2 text-xs text-[#49574f]">{weather.daily[0].precipitation}mm bekleniyor</p>
+                  <p className="mt-2 text-xs text-[#49574f]">{weather.daily[0].precipitation}mm expected</p>
                 </div>
               </div>
             </div>
@@ -143,7 +161,7 @@ export function WeatherWidget() {
           {/* Visit Suitability */}
           <div className="lg:col-span-1">
             <div className="weather-card h-full rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">ZİYARET DURUMU</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">VISIT SUITABILITY</p>
               <div className="mt-6 flex flex-col items-center justify-center space-y-4 text-center">
                 <div className="text-5xl">{suitabilityColor}</div>
                 <p className="text-sm font-semibold text-[#14251d]">{suitability.label}</p>
@@ -155,7 +173,7 @@ export function WeatherWidget() {
 
         {/* 7-Day Forecast */}
         <div className="mt-12">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#14251d]">7 Günlük Hava Tahmini</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#14251d]">7-Day Forecast</h3>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
             {weather.daily.map((day, i) => {
               const dayWeather = getWeatherCodeDescription(day.weatherCode);
@@ -168,7 +186,7 @@ export function WeatherWidget() {
                     <span>{day.maxTemp}°</span>
                     <span className="text-[#49574f]">{day.minTemp}°</span>
                   </div>
-                  <p className="mt-2 text-[10px] text-[#49574f]">{day.precipitationProbability}% yağış</p>
+                  <p className="mt-2 text-[10px] text-[#49574f]">{day.precipitationProbability}% rain</p>
                 </div>
               );
             })}
