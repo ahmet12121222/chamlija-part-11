@@ -3,7 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null references public.bookings(id) on delete cascade,
-  provider text not null default 'ikhokha',
+  provider text not null default 'manual',
   provider_payment_id text,
   provider_reference text,
   amount numeric(12,2) not null default 0,

@@ -65,18 +65,21 @@ export async function POST(request: Request) {
     const externalTransactionId = `booking-${bookingId}-${randomUUID()}`;
     const { data: paymentRecord, error: paymentError } = await supabaseAdmin
       .from("payments")
-      .insert([
-        {
-          booking_id: bookingId,
-          provider: "ikhokha",
-          provider_payment_id: null,
-          provider_reference: externalTransactionId,
-          amount: trustedAmountInCents,
-          currency: "ZAR",
-          status: "pending",
-          refund_amount: 0,
-        },
-      ])
+      .upsert(
+        [
+          {
+            booking_id: bookingId,
+            provider: "ikhokha",
+            provider_payment_id: null,
+            provider_reference: externalTransactionId,
+            amount: trustedAmountInCents,
+            currency: "ZAR",
+            status: "pending",
+            refund_amount: 0,
+          },
+        ],
+        { onConflict: "booking_id,provider,provider_payment_id" },
+      )
       .select("id, provider_payment_id, provider_reference, status")
       .single();
 

@@ -1,6 +1,6 @@
 // Canonical booking hours shared by the client UI and server-side validation.
 export const BOOKING_OPEN_TIME = "09:00";
-export const BOOKING_CLOSE_TIME = "18:00";
+export const BOOKING_CLOSE_TIME = "17:00";
 const SLOT_INTERVAL_MINUTES = 30;
 
 function toMinutes(value: string): number {

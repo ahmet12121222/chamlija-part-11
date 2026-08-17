@@ -28,7 +28,7 @@ export default async function AdminDashboardPage({
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
     .from("bookings")
-    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, selected_equipment_ids, notes")
+    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, payment_method, selected_equipment_ids, notes")
     .order("booking_date", { ascending: true })
     .order("booking_time", { ascending: true })
     .limit(200);
@@ -51,9 +51,8 @@ export default async function AdminDashboardPage({
     ? (
         await supabaseAdmin
           .from("payments")
-          .select("amount, refund_amount, status")
+          .select("id, amount, refund_amount, status, provider, payment_method")
           .eq("booking_id", selectedBooking.id)
-          .eq("provider", "ikhokha")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle()
@@ -179,6 +178,47 @@ export default async function AdminDashboardPage({
                 <div className="mt-2 text-sm text-slate-900">{selectedBooking.notes || "No extra notes."}</div>
               </div>
             </div>
+
+            {/* Payment Status Section */}
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-700">Payment Status</div>
+              <div className="mt-3 space-y-2">
+                <div>
+                  <span className="text-xs text-slate-600">Method:</span>
+                  <span className="ml-2 font-medium text-slate-900">{selectedBooking.payment_method ? formatStatus(selectedBooking.payment_method) : "Not selected"}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-600">Status:</span>
+                  <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatStatus(selectedBooking.payment_status)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-600">Amount:</span>
+                  <span className="ml-2 font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Manual Payment Confirmation */}
+            {["bank_transfer", "cash_at_gate"].includes(selectedBooking.payment_method) && selectedBooking.payment_status !== "paid" && (
+              <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-sm font-semibold text-emerald-900">Confirm Payment Received</div>
+                <p className="mt-2 text-sm text-emerald-800">
+                  {selectedBooking.payment_method === "bank_transfer"
+                    ? "Has the customer completed their bank transfer? Click below to confirm payment received."
+                    : "Did the customer pay cash at the gate? Click below to confirm payment received."}
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <form action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      ✓ Confirm Payment Received
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <div className="text-sm font-semibold text-amber-900">Cancellation / Refund Policy</div>

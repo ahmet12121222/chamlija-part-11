@@ -3,18 +3,29 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { BankTransferDisplay } from "@/components/booking/bank-transfer-display";
+import { CashAtGateDisplay } from "@/components/booking/cash-at-gate-display";
+import { PaymentMethodSelector } from "@/components/booking/payment-method-selector";
+import type { BookingPaymentSummary, PaymentMethod } from "@/lib/payments/manual";
 
 function PaymentContent() {
   const searchParams = useSearchParams();
   const bookingId = searchParams.get("bookingId") ?? "";
-  const [state, setState] = useState<{ loading: boolean; error: string | null; redirectUrl: string | null; paymentId: string | null; total: number | null }>({
+  const [state, setState] = useState<{
+    loading: boolean;
+    error: string | null;
+    booking: BookingPaymentSummary | null;
+    selectedMethod: PaymentMethod | null;
+    submitting: boolean;
+  }>({
     loading: Boolean(bookingId),
     error: bookingId ? null : "No booking reference was supplied.",
-    redirectUrl: null,
-    paymentId: null,
-    total: null,
+    booking: null,
+    selectedMethod: null,
+    submitting: false,
   });
 
+  // Load booking details on mount
   useEffect(() => {
     if (!bookingId) {
       return;
@@ -22,58 +33,90 @@ function PaymentContent() {
 
     let isMounted = true;
 
-    async function startPayment() {
+    async function loadBooking() {
       try {
-        const response = await fetch("/api/payments/ikhokha/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId }),
-        });
+        const response = await fetch(`/api/bookings/${bookingId}/details`);
 
-        const result = await response.json();
-
-        if (!response.ok || !result?.success) {
-          throw new Error(result?.error || "Unable to start the payment session.");
+        if (!response.ok) {
+          throw new Error("Could not load booking details.");
         }
 
-        const redirectUrl = typeof result.checkoutUrl === "string" && result.checkoutUrl ? result.checkoutUrl : result.redirectUrl || null;
+        const booking = (await response.json()) as BookingPaymentSummary;
 
         if (!isMounted) {
           return;
         }
 
-        setState({
+        setState((prev) => ({
+          ...prev,
           loading: false,
-          error: null,
-          redirectUrl,
-          paymentId: result.paymentId ?? null,
-          total: result.totalPrice ?? null,
-        });
-
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        }
+          booking,
+        }));
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        setState({
+        setState((prev) => ({
+          ...prev,
           loading: false,
-          error: error instanceof Error ? error.message : "Unable to start the payment session.",
-          redirectUrl: null,
-          paymentId: null,
-          total: null,
-        });
+          error: error instanceof Error ? error.message : "Unable to load booking details.",
+        }));
       }
     }
 
-    startPayment();
+    loadBooking();
 
     return () => {
       isMounted = false;
     };
   }, [bookingId]);
+
+  const handleMethodSelect = async (method: PaymentMethod) => {
+    if (!state.booking) return;
+
+    setState((prev) => ({
+      ...prev,
+      selectedMethod: method,
+      submitting: true,
+    }));
+
+    try {
+      const response = await fetch("/api/payments/manual/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: state.booking.id,
+          paymentMethod: method,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Failed to confirm payment method.";
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // Response was not JSON, use default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      setState((prev) => ({
+        ...prev,
+        submitting: false,
+      }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : "Failed to confirm payment method.",
+        submitting: false,
+        selectedMethod: null, // Reset selection on error
+      }));
+    }
+  };
 
   const totalFormatter = new Intl.NumberFormat("en-ZA", {
     style: "currency",
@@ -96,74 +139,65 @@ function PaymentContent() {
 
         <p className="text-sm font-semibold tracking-[0.18em] text-emerald-700">PAYMENT</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">
-          {state.loading ? "Preparing your payment" : state.error ? "Payment is currently unavailable" : "Continue to secure payment"}
+          {state.loading ? "Loading your booking" : state.error ? "Error" : state.selectedMethod ? "Complete Your Booking" : "Choose Your Payment Method"}
         </h1>
-        <p className="mt-4 text-base leading-7 text-slate-600">
-          {state.loading
-            ? "Your secure payment session is being prepared. You will be redirected shortly."
-            : state.error
-              ? state.error
-              : "Your reservation is confirmed and ready for payment. Please continue to the secure iKhokha payment page to complete your booking."}
-        </p>
 
-        {state.total !== null && (
-          <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Total Amount</div>
-            <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{totalFormatter.format(state.total)}</div>
+        {/* Loading State */}
+        {state.loading && (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+            <div className="inline-block animate-spin rounded-full border-4 border-slate-300 border-t-emerald-500 h-8 w-8"></div>
+            <p className="mt-4 text-slate-600">Loading your booking details...</p>
           </div>
         )}
 
-        {bookingId && (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            Booking reference: <span className="font-semibold text-slate-900">{bookingId}</span>
-            {state.paymentId && (
-              <>
-                <span className="mx-2 text-slate-400">•</span>
-                Payment reference: <span className="font-semibold text-slate-900">{state.paymentId}</span>
-              </>
+        {/* Error State */}
+        {state.error && (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <p className="font-semibold text-rose-900">{state.error}</p>
+            <Link href="/book" className="mt-3 inline-block rounded-full bg-rose-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-rose-700">
+              Start New Booking
+            </Link>
+          </div>
+        )}
+
+        {/* Booking Loaded - Show Method Selector or Selected Method */}
+        {!state.loading && state.booking && (
+          <div className="mt-6 space-y-6">
+            {/* Booking Summary */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">Booking Summary</div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <div className="text-xs text-slate-600">Reference:</div>
+                  <div className="font-mono font-semibold text-slate-900">{state.booking.reservation_code || state.booking.id}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-600">Total Amount:</div>
+                  <div className="font-semibold text-slate-900">{totalFormatter.format(Number(state.booking.total_price ?? 0))}</div>
+                </div>
+                {state.booking.booking_date && (
+                  <div>
+                    <div className="text-xs text-slate-600">Date:</div>
+                    <div className="font-medium text-slate-900">{state.booking.booking_date}</div>
+                  </div>
+                )}
+                {state.booking.booking_time && (
+                  <div>
+                    <div className="text-xs text-slate-600">Time:</div>
+                    <div className="font-medium text-slate-900">{state.booking.booking_time}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            {!state.selectedMethod ? (
+              <PaymentMethodSelector onSelect={handleMethodSelect} loading={state.submitting} />
+            ) : state.selectedMethod === "bank_transfer" ? (
+              <BankTransferDisplay booking={state.booking} />
+            ) : (
+              <CashAtGateDisplay booking={state.booking} />
             )}
-          </div>
-        )}
-
-        {!state.loading && state.redirectUrl && (
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <a
-              href={state.redirectUrl}
-              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800"
-            >
-              Continue to Payment
-            </a>
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-            >
-              <span aria-hidden="true">←</span>
-              Back to Home
-            </Link>
-          </div>
-        )}
-
-        {!state.loading && !state.redirectUrl && !state.error && bookingId && (
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/book" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
-              Return to Reservation
-            </Link>
-            <Link href="/" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
-              <span aria-hidden="true">←</span>
-              Back to Home
-            </Link>
-          </div>
-        )}
-
-        {!state.loading && state.error && (
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/book" className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800">
-              Make Another Reservation
-            </Link>
-            <Link href="/" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
-              <span aria-hidden="true">←</span>
-              Back to Home
-            </Link>
           </div>
         )}
       </div>

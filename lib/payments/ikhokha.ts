@@ -48,7 +48,7 @@ export function getIkhokhaConfig() {
   const applicationSecret = process.env.IKHOKHA_APPLICATION_SECRET?.trim() || process.env.IKHOKHA_APPLICATION_KEY_SECRET?.trim() || process.env.IKHOKHA_API_SECRET?.trim();
   const webhookSecret = process.env.IKHOKHA_WEBHOOK_SECRET?.trim() || applicationSecret;
   const externalEntityId = process.env.IKHOKHA_EXTERNAL_ENTITY_ID?.trim() || process.env.IKHOKHA_ENTITY_ID?.trim();
-  const returnUrl = process.env.IKHOKHA_RETURN_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+  const returnUrl = process.env.IKHOKHA_RETURN_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || "";
 
   return {
     baseUrl,
@@ -61,8 +61,8 @@ export function getIkhokhaConfig() {
 }
 
 export function isIkhokhaConfigured(): boolean {
-  const { applicationId, externalEntityId, baseUrl } = getIkhokhaConfig();
-  return Boolean(applicationId && externalEntityId && baseUrl);
+  const { applicationId, baseUrl } = getIkhokhaConfig();
+  return Boolean(applicationId && baseUrl);
 }
 
 export async function getBookingPaymentSummary(bookingId: string): Promise<BookingPaymentSummary | null> {
@@ -164,9 +164,8 @@ export function buildIkhokhaCheckoutRequest(booking: BookingPaymentSummary, call
   const { applicationId, externalEntityId } = getIkhokhaConfig();
   const amountInCents = toCents(Number(booking.total_price ?? 0));
 
-  return {
+  const request: Record<string, unknown> = {
     entityID: applicationId,
-    externalEntityID: externalEntityId,
     amount: amountInCents,
     currency: "ZAR",
     requesterUrl: getIkhokhaConfig().returnUrl,
@@ -180,10 +179,17 @@ export function buildIkhokhaCheckoutRequest(booking: BookingPaymentSummary, call
       cancelUrl,
     },
   };
+
+  if (externalEntityId) {
+    request.externalEntityID = externalEntityId;
+  }
+
+  return request;
 }
 
 export function createIkhokhaSignature(rawBody: string, secret: string): string {
-  return createHmac("sha256", secret).update(rawBody).digest("hex");
+  const escapedPayload = rawBody.replace(/\\/g, "\\\\").replace(/\"/g, '\\\"').replace(/\u0000/g, "\\0");
+  return createHmac("sha256", secret).update(escapedPayload).digest("hex");
 }
 
 export function verifyIkhokhaWebhookSignature({
@@ -201,7 +207,9 @@ export function verifyIkhokhaWebhookSignature({
     return false;
   }
 
-  const expectedSignature = createHmac("sha256", appSecret).update(`${path}${rawBody}`).digest("hex");
+  const payloadToSign = `${path}${rawBody}`;
+  const escapedPayload = payloadToSign.replace(/\\/g, "\\\\").replace(/\"/g, '\\\"').replace(/\u0000/g, "\\0");
+  const expectedSignature = createHmac("sha256", appSecret).update(escapedPayload).digest("hex");
   const providedSignature = receivedSignature.trim();
 
   if (providedSignature.length !== expectedSignature.length) {
@@ -225,14 +233,14 @@ export async function createIkhokhaCheckout(
   failureUrl: string,
   cancelUrl: string,
 ): Promise<IkhokhaCheckoutResponse> {
-  const { baseUrl, applicationId, applicationSecret, externalEntityId } = getIkhokhaConfig();
+  const { baseUrl, applicationId, applicationSecret, externalEntityId, returnUrl } = getIkhokhaConfig();
 
-  if (!baseUrl || !applicationId || !applicationSecret || !externalEntityId) {
+  if (!baseUrl || !applicationId || !applicationSecret || !returnUrl) {
     return {
       providerConfigured: false,
       checkoutUrl: null,
       redirectUrl: null,
-      providerMessage: "iKhokha provider details are incomplete. Set IKHOKHA_API_BASE_URL, IKHOKHA_APPLICATION_ID, IKHOKHA_APPLICATION_SECRET, and IKHOKHA_EXTERNAL_ENTITY_ID.",
+      providerMessage: "iKhokha provider details are incomplete. Set IKHOKHA_API_BASE_URL, IKHOKHA_APPLICATION_ID, IKHOKHA_APPLICATION_SECRET, and a valid public IKHOKHA_RETURN_URL or NEXT_PUBLIC_APP_URL.",
     };
   }
 
@@ -328,8 +336,8 @@ export async function getIkhokhaStatus(externalReference?: string | null, paymen
     }
   }
 
-  const statusValue = typeof payload?.status === "string" ? payload.status : typeof payload?.durum === "string" ? payload.durum : null;
-  const amountValue = Number(payload && typeof payload.amount === "number" ? payload.amount : typeof payload?.miktar === "number" ? payload.miktar : typeof payload?.amount === "string" ? payload.amount : typeof payload?.miktar === "string" ? payload.miktar : 0);
+  const statusValue = typeof payload?.status === "string" ? payload.status : null;
+  const amountValue = Number(payload && typeof payload.amount === "number" ? payload.amount : typeof payload?.amount === "string" ? payload.amount : 0);
 
   return {
     ok: response.ok,
