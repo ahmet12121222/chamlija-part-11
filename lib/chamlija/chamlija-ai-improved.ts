@@ -4,6 +4,8 @@
  * Dynamic, intent-based chatbot with playful but practical day planning.
  */
 
+const BOOKING_ROUTE = "/book";
+
 export type ChatResponseType =
   | "text"
   | "section"
@@ -33,7 +35,8 @@ export type ChatResponse = {
   type: ChatResponseType;
   sections: ChatResponseSection[];
   timeline?: TimelineItem[];
-  cta?: { label: string; action: "reservation" | "location" | "instagram" };
+  cta?: { label: string; action: "reservation" | "location" | "instagram"; href?: string };
+  planner?: { mode: "plan-my-day" };
 };
 
 export type VisitorProfile = {
@@ -75,6 +78,42 @@ const parseNumbers = (text: string): number[] => {
   return matches.map((value) => Number(value));
 };
 
+const parseSchoolGroupCounts = (text: string) => {
+  const normalized = normalize(text);
+  const numbers = parseNumbers(normalized);
+
+  const adultMatches = normalized.match(/(\d+)\s*(teacher|teachers|adult|adults|yetiskin|yetişkin|ogretmen|öğretmen|person|people|kisiler|kisi|adults?)/g) ?? [];
+  const childMatches = normalized.match(/(\d+)\s*(child|children|kid|kids|student|students|cocuk|çocuk|ogrenci|öğrenci|kids?)/g) ?? [];
+
+  const adults = adultMatches.length > 0
+    ? adultMatches.reduce((sum, match) => {
+        const value = Number(match.match(/\d+/)?.[0] ?? 0);
+        return sum + value;
+      }, 0)
+    : numbers[0] && normalized.includes("teacher") || normalized.includes("ogretmen") || normalized.includes("öğretmen") || normalized.includes("adult") || normalized.includes("yetiskin") || normalized.includes("yetişkin")
+      ? numbers[0]
+      : undefined;
+
+  const children = childMatches.length > 0
+    ? childMatches.reduce((sum, match) => {
+        const value = Number(match.match(/\d+/)?.[0] ?? 0);
+        return sum + value;
+      }, 0)
+    : numbers[1] && normalized.includes("child") || normalized.includes("cocuk") || normalized.includes("çocuk") || normalized.includes("student") || normalized.includes("ogrenci") || normalized.includes("öğrenci") || normalized.includes("kid")
+      ? numbers[1]
+      : undefined;
+
+  const totalPeople = numbers[0] ?? 0;
+  const fallbackAdults = adults ?? Math.max(1, Math.round(totalPeople * 0.12));
+  const fallbackChildren = children ?? Math.max(0, totalPeople - fallbackAdults);
+
+  return {
+    adults: adults ?? fallbackAdults,
+    children: children ?? fallbackChildren,
+    total: adults && children ? adults + children : totalPeople || fallbackAdults + fallbackChildren,
+  };
+};
+
 const getLanguage = (text: string): "en" | "tr" | "af" | "zu" | "xh" => {
   const normalized = normalize(text);
   // Detect language from keywords
@@ -107,10 +146,153 @@ export type UserIntent =
   | "plan-day"
   | "animals"
   | "rules"
+  | "own-furniture"
+  | "group-quote"
   | "unknown";
+
+const detectReservationArea = (text: string): string | null => {
+  const normalized = normalize(text);
+  const areaMap: Array<[string[], string]> = [
+    [["braai area", "braai", "barbeque area", "bbq area"], "Braai Area"],
+    [["ottoman corner", "ottoman"], "Ottoman Corner"],
+    [["grass area", "grass"], "Grass Area"],
+    [["picnic area", "picnic"], "Picnic Area"],
+  ];
+
+  for (const [keys, label] of areaMap) {
+    if (keys.some((key) => normalized.includes(key))) return label;
+  }
+
+  return null;
+};
+
+const detectOwnFurnitureQuestion = (text: string): boolean => {
+  const normalized = normalize(text);
+  const compact = normalized.replace(/[^a-z0-9]/g, "");
+
+  const ownTerms = [
+    "own",
+    "my own",
+    "kendi",
+    "benim kendi",
+    "kendimink",
+    "bring my own",
+    "bring own",
+    "getir",
+    "getirebilir",
+    "getirebilirim",
+    "bring",
+    "carry",
+    "briing",
+    "brng",
+  ];
+
+  const furnitureTerms = [
+    "table",
+    "chair",
+    "tables",
+    "chairs",
+    "furniture",
+    "masa",
+    "sandalye",
+    "masalar",
+    "sandalyeler",
+    "mobilya",
+    "masa ve sandalye",
+    "sandalyemi",
+    "masami",
+    "sandalyegetir",
+    "masagetir",
+    "masasandalye",
+    "tabel",
+    "sandalye",
+    "sndlye",
+    "sndly",
+    "masaa",
+  ];
+
+  const hasOwnSignal = ownTerms.some((term) => normalized.includes(term) || compact.includes(term.replace(/\s+/g, "")));
+  const hasFurnitureSignal = furnitureTerms.some((term) => normalized.includes(term) || compact.includes(term.replace(/\s+/g, "")));
+
+  const hasCombination =
+    (normalized.includes("own") && (normalized.includes("table") || normalized.includes("chair") || normalized.includes("furniture") || normalized.includes("masa") || normalized.includes("sandalye"))) ||
+    (normalized.includes("kendi") && (normalized.includes("masa") || normalized.includes("sandalye") || normalized.includes("mobilya"))) ||
+    (normalized.includes("masa") && (normalized.includes("sandalye") || normalized.includes("getire") || normalized.includes("getir"))) ||
+    (normalized.includes("sandalye") && (normalized.includes("masa") || normalized.includes("getire") || normalized.includes("getir"))) ||
+    (compact.includes("myowntable") || compact.includes("myownchair") || compact.includes("owntable") || compact.includes("ownchair") || compact.includes("ownfurniture") || compact.includes("kendimasa") || compact.includes("kendisandalye") || compact.includes("masasandalye") || compact.includes("masavesandalye") || compact.includes("sandalyegetir") || compact.includes("masagetir"));
+
+  return hasOwnSignal && hasFurnitureSignal || hasCombination;
+};
+
+const generateOwnFurnitureResponse = (input: string): ChatResponse => {
+  const language = getLanguage(input);
+
+  const answers: Record<typeof language, { title: string; content: string }> = {
+    en: {
+      title: "✅ Yes",
+      content: "Yes — you can bring your own table and chairs, as long as they fit the area and follow the site rules. If you want, I can help you plan the best setup for your booking.",
+    },
+    tr: {
+      title: "✅ Evet",
+      content: "Evet — kendi masa ve sandalyenizi getirebilirsiniz. Sadece alanın uygun olmasına ve Chamlija kurallarına uymasına dikkat etmeniz yeterlidir. İsterseniz rezervasyon için en uygun düzeni birlikte planlayabilirim.",
+    },
+    af: {
+      title: "✅ Ja",
+      content: "Ja — jy kan jou eie tafel en stoele bring, solank dit by die area pas en die reëls volg. As jy wil, kan ek jou help om die beste opset vir jou bespreking te beplan.",
+    },
+    zu: {
+      title: "✅ Yebo",
+      content: "Yebo — ungakwazi ukuza neta itafula lakho neziphini zakho, uma zihlangana nendawo futhi zilandela imithetho yesiza. Uma ufuna, ngingakusiza ukuhlela isakhiwo esifanele sokubhukha.",
+    },
+    xh: {
+      title: "✅ Ewe",
+      content: "Ewe — ungazisa itafile yakho neentyana zakho, njengoko zifanelekile kwindawo kwaye zilandela umthetho welizwe. Ukuba ufuna, ndingakunceda ukulungiselela isakhiwo esifanelekileyo sokubhukha.",
+    },
+  };
+
+  const chosen = answers[language] ?? answers.en;
+
+  return {
+    type: "text",
+    sections: [{ emoji: "✅", title: chosen.title, content: [chosen.content] }],
+  };
+};
+
+const buildReservationHref = (input: string): string => {
+  const params = new URLSearchParams();
+  const area = detectReservationArea(input);
+  const numbers = parseNumbers(normalize(input));
+  const adults = numbers[0] ?? 1;
+  const children = numbers[1] ?? 0;
+
+  if (area) params.set("area", area);
+  if (numbers.length > 0) {
+    params.set("adults", String(adults));
+    if (numbers.length > 1) params.set("children3Plus", String(children));
+  }
+
+  const ticketDate = input.match(/(next weekend|weekend|saturday|sunday|tomorrow|monday|tuesday|wednesday|thursday|friday)/i);
+  if (ticketDate) {
+    params.set("dateHint", ticketDate[0]);
+  }
+
+  const search = params.toString();
+  return search ? `${BOOKING_ROUTE}?${search}` : BOOKING_ROUTE;
+};
 
 export function detectIntent(input: string): UserIntent {
   const normalized = normalize(input);
+
+  const wantsQuote = containsAny(normalized, [
+    "fiyat teklifi", "fiyat teklif", "quote", "pricing quote", "price quote", "teklif alabilir miyiz", "quotation", "quote request",
+    "fiyat vermenizi", "price estimate", "estimate cost", "price estimate", "cost estimate", "offer",
+    "anaokulu", "okul", "school", "group visit", "school trip", "class trip", "teachers", "öğretmen", "ogretmen",
+    "kac para", "ne kadar tutar", "what is the total", "total cost", "group price"
+  ]);
+
+  if (wantsQuote && (containsAny(normalized, ["teacher", "teachers", "ogretmen", "öğretmen", "child", "children", "cocuk", "çocuk", "student", "students", "ogrenci", "öğrenci", "school", "anaokulu", "okul"]) || parseNumbers(normalized).length > 0)) {
+    return "group-quote";
+  }
 
   if (containsAny(normalized, ["merhaba", "selam", "hello", "hi", "hey", "good morning", "iyi gunler", "iyi aksamlar", "good day", "good evening"])) {
     return "greeting";
@@ -136,7 +318,7 @@ export function detectIntent(input: string): UserIntent {
     return "location";
   }
 
-  if (containsAny(normalized, ["rezerv", "booking", "book", "reserve", "randevu", "ayir", "rezervasyon"])) {
+  if (containsAny(normalized, ["rezerv", "booking", "book", "reserve", "randevu", "ayir", "rezervasyon", "make a reservation", "book a picnic area", "reserve the braai", "reserve the grass", "reserve the picnic", "reserve area"])) {
     return "reservation";
   }
 
@@ -158,6 +340,10 @@ export function detectIntent(input: string): UserIntent {
 
   if (containsAny(normalized, ["alkol", "alcohol", "muzik", "music", "rule", "kural", "yasak", "allowed"])) {
     return "rules";
+  }
+
+  if (detectOwnFurnitureQuestion(normalized)) {
+    return "own-furniture";
   }
 
   return "unknown";
@@ -574,7 +760,8 @@ export function generatePlanMyDayResponse(input: string = "", profileOverride?: 
     type: "itinerary",
     sections,
     timeline: itinerary,
-    cta: { label: language === "tr" ? "📅 Rezervasyon Yap" : "📅 Reserve Your Visit", action: "reservation" }
+    cta: { label: language === "tr" ? "📅 Rezervasyon Yap" : "📅 Reserve Your Visit", action: "reservation" },
+    planner: { mode: "plan-my-day" }
   };
 }
 
@@ -763,17 +950,37 @@ export function generateLocationResponse(): ChatResponse {
   };
 }
 
-export function generateReservationResponse(): ChatResponse {
+export function generateReservationResponse(input: string = ""): ChatResponse {
+  const area = detectReservationArea(input);
+  const normalized = normalize(input);
+  const language = getLanguage(input);
+
+  const areaText = area ?
+    (language === "tr" ? `"${area}" alanı için` : `for the "${area}"`) :
+    (language === "tr" ? "rezervasyon için" : "for your reservation");
+
+  const mainText = area
+    ? (language === "tr"
+      ? `Absolut! 😊 ${areaText} rezervasyon sürecine yönlendireceğim. Lütfen tarih, misafir sayısı ve alan seçimini rezervasyon sayfasında tamamlayın. Rezervasyonunuz, işlem tamamlanana kadar kesinleşmez.`
+      : `Absolutely 😊 I can help you with that. You can continue to the reservation page to choose your date, guest count and picnic area. Your reservation is only confirmed once the booking process is completed.`)
+    : (language === "tr"
+      ? "Absolut! 😊 Rezervasyon için rezervasyon sayfasına devam edebilirsiniz. Lütfen tarih, misafir sayısı ve alan seçimini orada tamamlayın. Rezervasyonunuz, işlem tamamlanana kadar kesinleşmez."
+      : "Absolutely 😊 I can help with that. You can continue to the reservation page to choose your date, guest count and picnic area. Your reservation will only be confirmed after the booking process is completed.");
+
   return {
     type: "text",
     sections: [
       {
         emoji: "📅",
-        title: "Rezervasyon",
-        content: "Ziyaretinizi hemen rezervasyon yapabilirsiniz. Aşağıdaki butona tıklayın."
+        title: language === "tr" ? "Rezervasyon" : "Reservation",
+        content: [mainText]
       }
     ],
-    cta: { label: "📅 Şimdi Rezervasyon Yap", action: "reservation" }
+    cta: {
+      label: language === "tr" ? "📅 Rezervasyon Sayfası" : "📅 Make a Reservation",
+      action: "reservation",
+      href: buildReservationHref(input),
+    }
   };
 }
 
@@ -837,14 +1044,90 @@ export function generateUnknownResponse(): ChatResponse {
   };
 }
 
+export function generateGroupQuoteResponse(input: string): ChatResponse {
+  const language = getLanguage(input);
+  const counts = parseSchoolGroupCounts(input);
+  const adults = counts.adults;
+  const children = counts.children;
+  const entrance = adults * 50 + children * 25;
+  const areaMatches = {
+    "ottoman": { label: "Ottoman Corner", price: 1500 },
+    "grass": { label: "Grass Area", price: 5500 },
+    "braai": { label: "Braai Area", price: 350 },
+    "picnic": { label: "Picnic Area", price: 0 },
+  };
+
+  const selectedArea = Object.entries(areaMatches).find(([key]) => normalize(input).includes(key))?.[1];
+  const areaPrice = selectedArea?.price ?? 0;
+  const totalWithArea = entrance + areaPrice;
+
+  const baseText = language === "tr"
+    ? `Evet, fiyat teklifi hazırlayabilirim. ${adults} yetişkin ve ${children} çocuk için giriş ücreti ${formatCurrency(entrance)} olur.`
+    : `Yes, I can prepare a quote. For ${adults} adults and ${children} children, the entrance fee is ${formatCurrency(entrance)}.`;
+
+  const areaText = selectedArea
+    ? language === "tr"
+      ? `Seçtiğiniz alan ${selectedArea.label} ise alan ücreti ${formatCurrency(areaPrice)} eklenir. Toplam tahmini ${formatCurrency(totalWithArea)} olur.`
+      : `If you choose ${selectedArea.label}, the area fee adds ${formatCurrency(areaPrice)}. The estimated total would be ${formatCurrency(totalWithArea)}.`
+    : language === "tr"
+      ? `İsterseniz uygun alan seçeneklerini de önerebilirim: Ottoman Corner, Grass Area veya Braai Area. Hangi köşeyi tercih edersiniz?`
+      : `I can also suggest the best picnic area options for your group, such as Ottoman Corner, Grass Area, or Braai Area. Which corner would you prefer?`;
+
+  return {
+    type: "pricing",
+    sections: [
+      {
+        emoji: "💰",
+        title: language === "tr" ? "Fiyat Teklifi" : "Price Quote",
+        content: [baseText, areaText],
+      },
+    ],
+    cta: {
+      label: language === "tr" ? "📅 Rezervasyon İsteği Gönder" : "📅 Send Reservation Request",
+      action: "reservation",
+      href: buildReservationHref(input),
+    },
+  };
+}
+
 export function buildChamlijaAIResponse(input: string): ChatResponse {
   const intent = detectIntent(input);
+  const counts = {
+    adults: parseNumbers(normalize(input)).find((value) => value > 0) ?? undefined,
+    children: parseNumbers(normalize(input)).slice(1).find((value) => value >= 0) ?? undefined,
+  };
+
+  const hasBudgetSignals = containsAny(normalize(input), ["cheap", "affordable", "budget", "low cost", "don't want to spend much", "not spend much", "free", "less than", "under", "cheap", "ucuz", "bütçe", "düşük"]);
+  const hasFamilySignals = containsAny(normalize(input), ["family", "children", "kids", "aile", "cocuk", "çocuk", "with kids"]);
+
+  if (hasBudgetSignals && hasFamilySignals && (counts.adults || counts.children)) {
+    const adults = counts.adults ?? 2;
+    const children = counts.children ?? 2;
+    const entranceTotal = adults * 50 + children * 25;
+
+    return {
+      type: "pricing",
+      sections: [
+        {
+          emoji: "💚",
+          title: "Family-friendly budget plan",
+          content: [
+            `For ${adults} adults and ${children} children, I’d start with free options like Animal Viewing, Yellow Wood Play Park and nature areas.`,
+            `Entrance total: ${adults} × ZAR 50 = ZAR ${adults * 50} | ${children} × ZAR 25 = ZAR ${children * 25}`,
+            `Estimated entrance total: ZAR ${entranceTotal}`,
+          ],
+          subtitle: "If you want something extra, Animal Feeding is ZAR 30 and the OX Wagon Tour is ZAR 60 adult / ZAR 50 child."
+        }
+      ],
+      cta: { label: "📅 Make a Reservation", action: "reservation", href: buildReservationHref(input) }
+    };
+  }
 
   switch (intent) {
     case "greeting":
-      return generateGreetingResponse();
+      return generateGreetingResponse(input);
     case "how-are-you":
-      return generateHowAreYouResponse();
+      return generateHowAreYouResponse(input);
     case "activities":
       return generateActivitiesResponse();
     case "family-recommendation":
@@ -856,13 +1139,17 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
     case "location":
       return generateLocationResponse();
     case "reservation":
-      return generateReservationResponse();
+      return generateReservationResponse(input);
     case "plan-day":
       return generatePlanMyDayResponse(input);
     case "animals":
       return generateAnimalsResponse();
     case "rules":
       return generateRulesResponse();
+    case "own-furniture":
+      return generateOwnFurnitureResponse(input);
+    case "group-quote":
+      return generateGroupQuoteResponse(input);
     default:
       return generateUnknownResponse();
   }

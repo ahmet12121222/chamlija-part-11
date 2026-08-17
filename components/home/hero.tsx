@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/components/site/language-provider";
+import { CHAMLIJA_MAPS_URL } from "@/lib/location";
 import { HERO_IMAGES } from "@/lib/media/chamlija-images";
 
 export function Hero() {
@@ -32,7 +33,7 @@ export function Hero() {
         <p className="mt-5 max-w-xl text-sm leading-7 text-white/80 sm:text-base sm:leading-8 lg:text-lg">
           {t("hero.description", "Enjoy a peaceful day in nature with picnic areas, outdoor experiences, family-friendly activities, and memorable celebrations.")}
         </p>
-        <div className="mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row">
+        <div className="mt-8 flex w-full max-w-xl flex-col gap-3 sm:flex-row">
           <Link
             href="/book"
             className="inline-flex w-full items-center justify-center rounded-full bg-[#f3eadb] px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-[#14251d] shadow-[0_16px_30px_rgba(20,37,29,0.16)] transition hover:-translate-y-0.5 hover:bg-white sm:w-auto sm:px-8"
@@ -40,10 +41,12 @@ export function Hero() {
             {t("common.reserveYourVisit", "Reserve Your Visit")}
           </Link>
           <a
-            href="#experiences"
-            className="inline-flex w-full items-center justify-center rounded-full border border-white/30 bg-white/5 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white backdrop-blur-sm transition hover:border-white/60 hover:bg-white/10 sm:w-auto sm:px-8"
+            href={CHAMLIJA_MAPS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex w-full items-center justify-center rounded-full border border-red-400/50 bg-red-600/35 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_rgba(220,38,38,0.25)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-red-300/70 hover:bg-red-500/50 sm:w-auto sm:px-8"
           >
-            {t("common.explore", "Explore Chamlija")}
+            📍 {t("common.location", "Location")}
           </a>
         </div>
       </div>

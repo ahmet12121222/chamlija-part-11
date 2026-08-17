@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   title: "Buyuk Chamlija | Escape to Nature",
   description:
     "Book your picnic area, tent or event space, activities and photo shoots at Buyuk Chamlija — a premium nature destination for family days out.",
+  icons: {
+    icon: "/logo/logo-mark.png",
+    shortcut: "/logo/logo-mark.png",
+    apple: "/logo/logo-mark.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

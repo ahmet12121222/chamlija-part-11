@@ -14,10 +14,10 @@ export function PricingCalculatorSection() {
             💰 {t("priceCalculator.title", "Price Calculator")}
           </div>
           <h2 className="text-4xl font-bold text-amber-900 mb-4">
-            Plan Your Budget
+            {t("priceCalculator.heading", "Plan Your Budget")}
           </h2>
           <p className="text-lg text-amber-800 max-w-2xl mx-auto">
-            Use our interactive price calculator to explore different combinations of activities and services. See exactly what your visit will cost before you book.
+            {t("priceCalculator.description", "Use our interactive price calculator to explore different combinations of activities and services. See exactly what your visit will cost before you book.")}
           </p>
         </div>
 

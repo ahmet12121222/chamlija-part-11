@@ -1,12 +1,53 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/site/language-provider";
 import { getWeatherCodeDescription, getVisitSuitability, type WeatherData } from "@/lib/weather/getWeather";
 
 export function WeatherWidget() {
+  const { t } = useLanguage();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const getUVLevel = (uvIndex: number): string => {
+    if (uvIndex <= 2) return t("weatherLevels.low", "Low");
+    if (uvIndex <= 5) return t("weatherLevels.moderate", "Moderate");
+    if (uvIndex <= 7) return t("weatherLevels.high", "High");
+    if (uvIndex <= 10) return t("weatherLevels.veryHigh", "Very High");
+    return t("weatherLevels.extreme", "Extreme");
+  };
+
+  const getUVAdvice = (uvIndex: number): string => {
+    if (uvIndex <= 2) return t("uvAdvice.low", "UV level is low, skin protection is not necessary.");
+    if (uvIndex <= 5) return t("uvAdvice.moderate", "Moderate UV level. Sunglasses and a hat are recommended.");
+    if (uvIndex <= 7) return t("uvAdvice.high", "High UV. Don't forget sunscreen (SPF 30+).");
+    if (uvIndex <= 10) return t("uvAdvice.veryHigh", "Very high UV. Sunscreen and hat required. Avoid outdoors during midday.");
+    return t("uvAdvice.extreme", "Extreme UV. Apply full protection sunscreen.");
+  };
+
+  const getVisitMessage = (level: string, current: WeatherData["current"]): string => {
+    if (level === "excellent") return t("visitSuitability.excellent", "Weather conditions are excellent for exploring Chamlija.");
+    if (level === "good") {
+      if (current.windSpeed > 15) return t("visitSuitability.goodWithWind", "Light wind is present but activities are still possible.");
+      if (current.uvIndex > 6) return t("visitSuitability.goodWithSun", "Sunny day. Get sun protection.");
+      return t("visitSuitability.good", "Suitable for outdoor activities.");
+    }
+    if (level === "caution") {
+      if (current.temperature > 30) return t("visitSuitability.cautionHot", "Hot day. Drink plenty of water.");
+      if (current.windSpeed > 20) return t("visitSuitability.cautionWind", "Strong wind. Be cautious.");
+      return t("visitSuitability.caution", "Pay attention to weather conditions.");
+    }
+    return t("visitSuitability.notSuitable", "Outdoor activities are not recommended today.");
+  };
+
+  const getDayName = (date: string, index: number): string => {
+    if (index === 0) return t("common.today", "Today");
+    if (index === 1) return t("common.tomorrow", "Tomorrow");
+    const d = new Date(date);
+    const days = [t("days.sunday", "Sun"), t("days.monday", "Mon"), t("days.tuesday", "Tue"), t("days.wednesday", "Wed"), t("days.thursday", "Thu"), t("days.friday", "Fri"), t("days.saturday", "Sat")];
+    return days[d.getDay()];
+  };
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -102,11 +143,11 @@ export function WeatherWidget() {
 
       <div className="relative mx-auto max-w-6xl">
         <div className="mb-12">
-          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Weather</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">{t("common.weather", "Weather")}</p>
           <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-            What is the weather like at Chamlija today?
+            {t("weather.heading", "What is the weather like at Chamlija today?")}
           </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-[#49574f]">Check the weather before planning your visit.</p>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[#49574f]">{t("weather.subheading", "Check the weather before planning your visit.")}</p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -200,45 +241,6 @@ export function WeatherWidget() {
       </div>
     </section>
   );
-}
-
-function getUVLevel(uvIndex: number): string {
-  if (uvIndex <= 2) return "Düşük";
-  if (uvIndex <= 5) return "Orta";
-  if (uvIndex <= 7) return "Yüksek";
-  if (uvIndex <= 10) return "Çok Yüksek";
-  return "Aşırı Yüksek";
-}
-
-function getUVAdvice(uvIndex: number): string {
-  if (uvIndex <= 2) return "UV seviyesi düşük, deri koruması gerekli değil.";
-  if (uvIndex <= 5) return "Orta UV seviyesi. Gözlük ve şapka kullanmanız önerilir.";
-  if (uvIndex <= 7) return "Yüksek UV. Güneş kremi (SPF 30+) sürmeyi unutmayın.";
-  if (uvIndex <= 10) return "Çok yüksek UV. Güneş kremi ve şapka şart. Öğlen saatlerinde dışında kalın.";
-  return "Aşırı yüksek UV. Tam korumalı güneş kremini sürün.";
-}
-
-function getDayName(date: string, index: number): string {
-  if (index === 0) return "Bugün";
-  if (index === 1) return "Yarın";
-  const d = new Date(date);
-  const days = ["Pzr", "Pzt", "Sal", "Çar", "Per", "Cum", "Cts"];
-  return days[d.getDay()];
-}
-
-function getVisitMessage(level: string, current: WeatherData["current"]): string {
-  if (level === "excellent") return "Hava koşulları Chamlija'yı keşfetmek için mükemmel.";
-  if (level === "good") {
-    if (current.windSpeed > 15) return "Hafif rüzgar var ama aktivite yapmak mümkün.";
-    if (current.uvIndex > 6) return "Güneşli bir gün. Güneş koruması alın.";
-    return "Açık hava aktiviteleri için uygun.";
-  }
-  if (level === "caution") {
-    if (current.temperature > 30) return "Sıcak bir gün. Bol su için.";
-    if (current.windSpeed > 20) return "Kuvvetli rüzgar. Dikkat edin.";
-    return "Hava koşullarına dikkat edin.";
-  }
-  return "Bugün açık hava aktiviteleri uygun değil.";
 }
 
 interface WeatherAlertProps {

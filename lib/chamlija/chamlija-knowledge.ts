@@ -1,3 +1,5 @@
+import { CHAMLIJA_MAPS_URL } from "@/lib/location";
+
 const DAY_NAMES = [
   "sunday",
   "monday",
@@ -92,7 +94,7 @@ export const chamlijaKnowledge = {
   },
   contact: {
     instagram: "Instagram: @buyukchamlija",
-    location: "Location: https://maps.app.goo.gl/zf7qVqF4mqL8er928?g_st=ac",
+    location: `Location: ${CHAMLIJA_MAPS_URL}`,
   },
   animals: {
     summary: "Chamlija has around 50 types of animals, including chicken, camel, rabbit, duck, llama, donkey, dog, sheep, squirrel, goat, pheasant, goose and other animals.",

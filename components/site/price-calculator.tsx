@@ -79,13 +79,13 @@ export default function PriceCalculator() {
 
   const calcLabel =
     language === "tr"
-      ? "Fiyat Hesaplayıcı"
+      ? t("priceCalculator.title", "Price Calculator")
       : language === "af"
-        ? "Pryskalkulator"
+        ? t("priceCalculator.title", "Price Calculator")
         : language === "zu"
-          ? "Isibali Senani"
+          ? t("priceCalculator.title", "Price Calculator")
           : language === "xh"
-            ? "Isibali Senani"
+            ? t("priceCalculator.title", "Price Calculator")
             : t("priceCalculator.title", "Price Calculator");
 
   return (
@@ -215,9 +215,9 @@ export default function PriceCalculator() {
               className="w-5 h-5 text-amber-600 rounded"
             />
             <div className="ml-3 flex-1">
-              <div className="font-medium text-amber-900">🥕 Animal Feeding</div>
+              <div className="font-medium text-amber-900">🥕 {t("priceCalculator.animalFeeding", "Animal Feeding")}</div>
               <div className="text-sm text-amber-700">
-                ZAR {PRICES.activities.animalFeeding.adult} per person
+                ZAR {PRICES.activities.animalFeeding.adult} {t("priceCalculator.perPerson", "per person")}
               </div>
             </div>
           </label>
@@ -231,17 +231,17 @@ export default function PriceCalculator() {
               className="w-5 h-5 text-amber-600 rounded"
             />
             <div className="ml-3 flex-1">
-              <div className="font-medium text-amber-900">🚜 OX Wagon Tour</div>
+              <div className="font-medium text-amber-900">🚜 {t("priceCalculator.oxWagon", "OX Wagon Tour")}</div>
               <div className="text-sm text-amber-700">
-                ZAR {PRICES.activities.oxWagon.adult} adult / ZAR{" "}
-                {PRICES.activities.oxWagon.child} child
+                ZAR {PRICES.activities.oxWagon.adult} {t("common.adults", "adult")} / ZAR{" "}
+                {PRICES.activities.oxWagon.child} {t("booking.childrenUnder3", "child")}
               </div>
             </div>
           </label>
 
           {pricing.activities > 0 && (
             <div className="bg-blue-50 p-3 rounded text-right font-semibold text-blue-900">
-              Activities: ZAR {pricing.activities.toFixed(0)}
+              {t("common.activities", "Activities")}: ZAR {pricing.activities.toFixed(0)}
             </div>
           )}
         </div>

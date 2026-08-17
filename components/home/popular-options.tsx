@@ -6,16 +6,17 @@ import { useLanguage } from "@/components/site/language-provider";
 import type { ProductRecord } from "@/lib/products/types";
 import { getProductImage } from "@/lib/media/chamlija-images";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  picnic_area: "Picnic Area",
-  equipment: "Equipment",
-  paid_activity: "Activity",
-  tent_event_area: "Tent & Event Area",
-  photo_shoot: "Photo Shoot",
-};
-
 export function PopularOptions({ products }: { products: ProductRecord[] }) {
   const { t } = useLanguage();
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    picnic_area: t("pricing.category.picnicArea", "Picnic Area"),
+    equipment: t("pricing.category.equipment", "Equipment"),
+    paid_activity: t("pricing.category.activity", "Activity"),
+    tent_event_area: t("pricing.category.tentEventArea", "Tent & Event Area"),
+    photo_shoot: t("pricing.category.photoShoot", "Photo Shoot"),
+  };
+
   const options = products
     .filter((product) => product.is_active && product.is_bookable && !product.is_free && product.category !== "free_activity")
     .sort((a, b) => (a.item_order ?? 0) - (b.item_order ?? 0) || a.name.localeCompare(b.name))

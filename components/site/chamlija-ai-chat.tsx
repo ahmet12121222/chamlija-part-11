@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/components/site/language-provider";
-import { buildChamlijaAIResponse, type ChatResponse } from "@/lib/chamlija/chamlija-ai-improved";
+import { CHAMLIJA_MAPS_URL } from "@/lib/location";
+import { buildChamlijaAIResponse, detectIntent, type ChatResponse } from "@/lib/chamlija/chamlija-ai-improved";
+import { generatePersonalizedPlan, getPlannerActivityOptions, getPlanOpeningHoursSummary, type PlanPreference, type PlannerPlanState } from "@/lib/chamlija/chamlija-plan-my-day-advanced";
 
-const GOOGLE_MAPS_URL = "https://maps.app.goo.gl/zf7qVqF4mqL8er928?g_st=ac";
 const BOOKING_ROUTE = "/book";
 
 type ChatMessage = {
@@ -16,21 +18,35 @@ type ChatMessage = {
   action?: { kind: "link" | "route"; href: string; label: string };
 };
 
+type PlannerStep = "group" | "people" | "preferences" | "activities" | "arrival" | "summary";
+
+type PlannerState = PlannerPlanState & { step: PlannerStep };
+
+const defaultPlannerState = (): PlannerState => ({
+  step: "group",
+  groupType: "family",
+  adults: 2,
+  children: 0,
+  childrenAgeRanges: [],
+  preferences: ["nature"],
+  chosenActivities: [],
+  arrivalTime: "09:30",
+});
+
+const plannerStepOrder: PlannerStep[] = ["group", "people", "preferences", "activities", "arrival", "summary"];
+
 export function ChamlijaAIChat() {
   const { language, t } = useLanguage();
+  const router = useRouter();
 
-  const starterSuggestions = [
-    language === "tr" ? "👋 Merhaba" : language === "af" ? "👋 Hallo" : language === "zu" ? "👋 Sawubona" : language === "xh" ? "👋 Molo" : "👋 Hello",
-    language === "tr" ? "💰 Fiyatlar" : language === "af" ? "💰 Pryse" : language === "zu" ? "💰 Amanani" : language === "xh" ? "💰 Ixabiso" : "💰 Prices",
-    language === "tr" ? "🌿 Aktiviteler" : language === "af" ? "🌿 Aktiwiteite" : language === "zu" ? "🌿 Imisebenzi" : language === "xh" ? "🌿 Imisebenzi" : "🌿 Activities",
-    language === "tr" ? "👨‍👩‍👧 Aile" : language === "af" ? "👨‍👩‍👧 Familie" : language === "zu" ? "👨‍👩‍👧 Umndeni" : language === "xh" ? "👨‍👩‍👧 Usapho" : "👨‍👩‍👧 Family",
-    language === "tr" ? "📍 Konum" : language === "af" ? "📍 Ligging" : language === "zu" ? "📍 Indawo" : language === "xh" ? "📍 Indawo" : "📍 Location",
-    language === "tr" ? "✨ Günümü Planla" : language === "af" ? "✨ Beplan My Dag" : language === "zu" ? "✨ Hlela Usuku Lwami" : language === "xh" ? "✨ Cwangcisa Usuku Lwam" : "✨ Plan My Day",
-  ];
+  const starterSuggestions = t("ai.quickActions", ["👋 Hello", "💰 Prices", "🌿 Activities", "👨‍👩‍👧 Family", "📍 Location", "📅 Reservation", "✨ Plan My Day"]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [plannerState, setPlannerState] = useState<PlannerState>(defaultPlannerState());
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerResult, setPlannerResult] = useState<ReturnType<typeof generatePersonalizedPlan> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-1",
@@ -58,11 +74,39 @@ export function ChamlijaAIChat() {
       text: trimmed,
     };
 
+    const intent = detectIntent(trimmed);
+    const shouldOpenPlanner = intent === "plan-day" || /plan my day|my day|itinerary|day plan|schedule/i.test(trimmed);
+
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setIsTyping(true);
 
     window.setTimeout(() => {
+      if (plannerOpen && plannerResult && !shouldOpenPlanner) {
+        const followUpHandled = handlePlannerFollowUp(trimmed);
+        if (followUpHandled) {
+          setMessages((current) => [...current, {
+            id: `ai-${Date.now() + 1}`,
+            sender: "ai",
+            text: language === "tr" ? "Planımı güncelledim. İsterseniz tercihleri de değiştirebiliriz." : "I’ve updated the plan. I can keep refining it for you.",
+          }]);
+          setIsTyping(false);
+          return;
+        }
+      }
+
+      if (shouldOpenPlanner) {
+        setPlannerOpen(true);
+        const plannerMessage: ChatMessage = {
+          id: `ai-${Date.now() + 1}`,
+          sender: "ai",
+          text: language === "tr" ? "Harika! Gününüzü adım adım planlayalım. Önce kiminle geldiğinizi seçelim." : "Perfect! Let’s build your day step by step. First, tell me who you’re visiting with.",
+        };
+        setMessages((current) => [...current, plannerMessage]);
+        setIsTyping(false);
+        return;
+      }
+
       const response = buildChamlijaAIResponse(trimmed);
       const reply: ChatMessage = {
         id: `ai-${Date.now() + 1}`,
@@ -70,13 +114,21 @@ export function ChamlijaAIChat() {
         response,
       };
 
+      if (response.planner?.mode === "plan-my-day") {
+        setPlannerOpen(true);
+      }
+
       if (response.cta) {
         if (response.cta.action === "reservation") {
-          reply.action = { kind: "route", href: BOOKING_ROUTE, label: response.cta.label };
+          reply.action = {
+            kind: "route",
+            href: response.cta.href ?? BOOKING_ROUTE,
+            label: response.cta.label,
+          };
         } else if (response.cta.action === "location") {
-          reply.action = { kind: "link", href: GOOGLE_MAPS_URL, label: response.cta.label };
+          reply.action = { kind: "link", href: response.cta.href ?? CHAMLIJA_MAPS_URL, label: response.cta.label };
         } else if (response.cta.action === "instagram") {
-          reply.action = { kind: "link", href: "https://www.instagram.com/buyukchamlija/", label: response.cta.label };
+          reply.action = { kind: "link", href: response.cta.href ?? "https://www.instagram.com/buyukchamlija/", label: response.cta.label };
         }
       }
 
@@ -85,10 +137,157 @@ export function ChamlijaAIChat() {
     }, 800);
   };
 
+  const currentPlannerStepIndex = plannerStepOrder.indexOf(plannerState.step);
+  const currentPlannerStep = plannerStepOrder[currentPlannerStepIndex] ?? "group";
+
+  const updatePlannerStep = (nextStep: PlannerStep) => {
+    setPlannerState((current) => ({ ...current, step: nextStep }));
+  };
+
+  const buildPlanFromCurrentState = () => generatePersonalizedPlan({
+    groupType: plannerState.groupType,
+    adults: plannerState.adults,
+    children: plannerState.children,
+    childrenAgeRanges: plannerState.childrenAgeRanges,
+    preferences: plannerState.preferences,
+    chosenActivities: plannerState.chosenActivities,
+    arrivalTime: plannerState.arrivalTime,
+  });
+
+  const startPlanWizard = () => {
+    setPlannerOpen(true);
+    setPlannerState(defaultPlannerState());
+    setPlannerResult(null);
+  };
+
+  const finalizePlanner = () => {
+    const plan = buildPlanFromCurrentState();
+
+    setPlannerResult(plan);
+    setPlannerState((current) => ({ ...current, step: "summary" }));
+
+    const aiResponse: ChatMessage = {
+      id: `planner-${Date.now()}`,
+      sender: "ai",
+      response: {
+        type: "itinerary",
+        sections: [
+          { emoji: "✨", title: "Your personalized day plan", content: [plan.summary, plan.reason] },
+          { emoji: "💰", title: "Estimated spend", content: [`ZAR ${plan.cost}`] },
+        ],
+        timeline: plan.slots.map((slot) => ({
+          time: slot.time,
+          title: slot.title,
+          description: slot.description,
+          price: slot.price,
+          note: slot.note,
+          badge: slot.badge,
+        })),
+        cta: { label: "📅 Reserve Your Visit", action: "reservation" },
+      },
+    };
+
+    setMessages((current) => [...current, aiResponse]);
+  };
+
+  const handlePlannerFollowUp = (value: string) => {
+    if (!plannerResult) {
+      return false;
+    }
+
+    const trimmed = value.trim();
+    const lower = trimmed.toLowerCase();
+    let nextPreferences = [...plannerState.preferences] as PlanPreference[];
+    let nextChosenActivities = [...plannerState.chosenActivities];
+
+    const toPreferenceList = (values: string[]) => values as PlanPreference[];
+
+    if (lower.includes("relax") || lower.includes("more relaxing")) {
+      nextPreferences = toPreferenceList([...new Set([...nextPreferences, "nature", "picnic"])]) as PlanPreference[];
+      nextChosenActivities = nextChosenActivities.filter((activity) => activity !== "cycling" && activity !== "basketball");
+      setPlannerState((current) => ({ ...current, preferences: nextPreferences, chosenActivities: nextChosenActivities, step: "preferences" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("remove cycling") || lower.includes("no cycling")) {
+      nextPreferences = nextPreferences.filter((item) => item !== "cycling");
+      nextChosenActivities = nextChosenActivities.filter((item) => item !== "cycling");
+      setPlannerState((current) => ({ ...current, preferences: nextPreferences, chosenActivities: nextChosenActivities, step: "preferences" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("add basketball") || lower.includes("basketball")) {
+      nextPreferences = toPreferenceList([...new Set([...nextPreferences, "sports"])]) as PlanPreference[];
+      nextChosenActivities = [...new Set([...nextChosenActivities, "basketball"])];
+      setPlannerState((current) => ({ ...current, preferences: nextPreferences, chosenActivities: nextChosenActivities, step: "activities" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("make it cheaper") || lower.includes("cheaper")) {
+      nextPreferences = toPreferenceList([...new Set([...nextPreferences, "nature", "family"])]) as PlanPreference[];
+      nextChosenActivities = nextChosenActivities.filter((activity) => activity !== "animal-feeding" && activity !== "ox-wagon-tour");
+      setPlannerState((current) => ({ ...current, preferences: nextPreferences, chosenActivities: nextChosenActivities, step: "preferences" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("arriving at") || lower.includes("we are arriving") || lower.includes("at 12") || lower.includes("12:00")) {
+      const match = trimmed.match(/(\d{1,2}:\d{2}|\d{1,2})/);
+      const time = match ? match[0].includes(":") ? match[0] : `${match[0]}:00` : "12:00";
+      setPlannerState((current) => ({ ...current, arrivalTime: time, step: "arrival" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("more animal") || lower.includes("animal activities")) {
+      nextPreferences = toPreferenceList([...new Set([...nextPreferences, "animals"])]) as PlanPreference[];
+      setPlannerState((current) => ({ ...current, preferences: nextPreferences, step: "preferences" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("romantic")) {
+      setPlannerState((current) => ({ ...current, groupType: "couple", preferences: toPreferenceList([...new Set([...current.preferences, "romantic", "nature"])]) as PlanPreference[], step: "preferences" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("wagon") || lower.includes("ox wagon")) {
+      nextChosenActivities = [...new Set([...nextChosenActivities, "ox-wagon-tour"])];
+      setPlannerState((current) => ({ ...current, chosenActivities: nextChosenActivities, step: "activities" }));
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    if (lower.includes("create another plan") || lower.includes("another plan")) {
+      setPlannerResult(buildPlanFromCurrentState());
+      return true;
+    }
+
+    return false;
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     sendMessage();
   };
+
+  // Sayfa load'da konuşmayı sıfırla
+  useEffect(() => {
+    const welcomeMessage: ChatMessage = {
+      id: "welcome-1",
+      sender: "ai",
+      text: t("ai.welcome", "👋 Welcome to Chamlija AI!\nI'm here to help you plan an amazing visit."),
+    };
+    setMessages([welcomeMessage]);
+    setPlannerState(defaultPlannerState());
+    setPlannerResult(null);
+    setPlannerOpen(false);
+    setInput("");
+  }, [t]);
 
   return (
     <>
@@ -109,8 +308,17 @@ export function ChamlijaAIChat() {
         <span className="drop-shadow-sm">🌿</span>
       </button>
 
+      {/* Chat Backdrop - ekranın boş yerine tıklanırsa chat kapanması için */}
       {isOpen && (
-        <div className="fixed bottom-5 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[410px] overflow-hidden rounded-[28px] border border-[#d7e8df]/80 bg-white/75 shadow-[0_24px_60px_rgba(24,42,31,0.14)] backdrop-blur-xl sm:right-6">
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {isOpen && (
+        <div className="fixed bottom-5 right-3 z-50 w-[min(100vw-1rem,410px)] overflow-hidden rounded-[28px] border border-[#d7e8df]/80 bg-white/75 shadow-[0_24px_60px_rgba(24,42,31,0.14)] backdrop-blur-xl sm:right-6">
           <div className="flex max-h-[min(700px,calc(100vh-40px))] min-h-[420px] flex-col overflow-hidden sm:h-[560px]">
             {/* Header */}
             <div className="relative border-b border-[#e4efe7] bg-gradient-to-r from-[#f6fbff] via-[#f9f7f1] to-[#f7f9ee] px-4 py-3 sm:px-5">
@@ -288,6 +496,254 @@ export function ChamlijaAIChat() {
 
                 <div ref={messagesEndRef} />
               </div>
+
+              {plannerOpen && (
+                <div className="mt-3 rounded-2xl border border-[#dfeae0] bg-white/90 p-3 shadow-[0_10px_24px_rgba(18,33,28,0.06)]">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#59715c]">PLAN MY DAY</div>
+                      <div className="text-sm font-semibold text-[#1d2a24]">{language === "tr" ? "Adım adım gün planı" : "Step-by-step day planner"}</div>
+                    </div>
+                    <button type="button" onClick={startPlanWizard} className="rounded-full border border-[#d8e5d8] bg-[#f3faf4] px-2 py-1 text-[10px] font-medium text-[#2d4638]">Reset</button>
+                  </div>
+
+                  {currentPlannerStep === "group" && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        {(["family", "couple", "friends", "solo"] as const).map((group) => (
+                          <button
+                            key={group}
+                            type="button"
+                            onClick={() => {
+                              setPlannerState((current) => ({ ...current, groupType: group, step: "people" }));
+                            }}
+                            className={`rounded-2xl border p-3 text-left text-sm font-medium transition ${plannerState.groupType === group ? "border-[#80b09a] bg-[#edf9f2] text-[#1d352a]" : "border-[#e4ece6] bg-[#fafcfb] text-[#30473d]"}`}
+                          >
+                            <div className="text-lg">{group === "family" ? "👨‍👩‍👧" : group === "couple" ? "❤️" : group === "friends" ? "👥" : "🧍"}</div>
+                            <div className="mt-1 capitalize">{group}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentPlannerStep === "people" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="rounded-xl border border-[#e7ece7] bg-[#f9fbfa] p-2 text-xs text-[#42554a]">
+                          <span className="mb-1 block font-medium">Adults</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={plannerState.adults}
+                            onChange={(event) => setPlannerState((current) => ({ ...current, adults: Number(event.target.value) || 1 }))}
+                            className="w-full rounded-lg border border-[#dfe9e3] bg-white px-2 py-1.5 text-sm text-[#1c2721] outline-none"
+                          />
+                        </label>
+                        <label className="rounded-xl border border-[#e7ece7] bg-[#f9fbfa] p-2 text-xs text-[#42554a]">
+                          <span className="mb-1 block font-medium">Children</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={plannerState.children}
+                            onChange={(event) => setPlannerState((current) => ({ ...current, children: Number(event.target.value) || 0 }))}
+                            className="w-full rounded-lg border border-[#dfe9e3] bg-white px-2 py-1.5 text-sm text-[#1c2721] outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      {plannerState.children > 0 && (
+                        <div className="rounded-xl border border-[#e8efe9] bg-[#f8fbf9] p-2">
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4d675b]">Age ranges</div>
+                          <div className="flex flex-wrap gap-2">
+                            {['0–3', '4–7', '8–12', '13+'].map((range) => {
+                              const isSelected = plannerState.childrenAgeRanges.includes(range);
+                              return (
+                                <button
+                                  key={range}
+                                  type="button"
+                                  onClick={() => setPlannerState((current) => ({
+                                    ...current,
+                                    childrenAgeRanges: isSelected
+                                      ? current.childrenAgeRanges.filter((item) => item !== range)
+                                      : [...current.childrenAgeRanges, range],
+                                  }))}
+                                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isSelected ? 'border-[#81b49e] bg-[#edf9f1] text-[#1d2d28]' : 'border-[#e4ece5] bg-white text-[#42574e]'}`}
+                                >
+                                  {range}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {currentPlannerStep === "preferences" && (
+                    <div className="flex flex-col">
+                      <div className="min-h-0 max-h-[min(280px,calc(100dvh-380px))] overflow-y-auto pr-2 sm:max-h-[min(320px,calc(100dvh-360px))]">
+                        <div className="space-y-2">
+                          {[
+                            ["nature", "🌿 Nature"],
+                            ["animals", "🐐 Animals"],
+                            ["sports", "🏀 Sports"],
+                            ["picnic", "🧺 Picnic"],
+                            ["family", "👨‍👩‍👧 Family"],
+                            ["adventure", "🚵 Adventure"],
+                          ].map(([value, label]) => {
+                            const active = plannerState.preferences.includes(value as never);
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setPlannerState((current) => ({
+                                  ...current,
+                                  preferences: active ? current.preferences.filter((item) => item !== value) : [...current.preferences, value as never],
+                                }))}
+                                className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition ${active ? "border-[#8bb6a5] bg-[#f0faf4] text-[#1e352d]" : "border-[#e5ece7] bg-[#fbfdfb] text-[#374d45]"}`}
+                              >
+                                <span>{label}</span>
+                                <span>{active ? "✓" : "+"}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="h-2" />
+                      </div>
+                    </div>
+                  )}
+
+                  {currentPlannerStep === "activities" && (
+                    <div className="flex flex-col">
+                      <div className="min-h-0 max-h-[min(280px,calc(100dvh-380px))] overflow-y-auto pr-2 sm:max-h-[min(320px,calc(100dvh-360px))]">
+                        <div className="space-y-2">
+                          {getPlannerActivityOptions().map((option) => {
+                            const selected = plannerState.chosenActivities.includes(option.id);
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => setPlannerState((current) => ({
+                                  ...current,
+                                  chosenActivities: selected ? current.chosenActivities.filter((id) => id !== option.id) : [...current.chosenActivities, option.id],
+                                }))}
+                                className={`flex w-full items-center justify-between rounded-xl border p-2 text-left transition ${selected ? "border-[#87b5a4] bg-[#eefaf3]" : "border-[#e6ece7] bg-[#fcfdfd]"}`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{option.emoji}</span>
+                                  <span className="text-sm font-medium text-[#1e2d27]">{option.title}</span>
+                                </span>
+                                <span className="text-[10px] text-[#526a5d]">{option.price ? `ZAR ${option.price}` : "Free"}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="h-2" />
+                      </div>
+                    </div>
+                  )}
+
+                  {currentPlannerStep === "arrival" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          ["09:30", "Morning"],
+                          ["13:30", "Afternoon"],
+                        ].map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setPlannerState((current) => ({ ...current, arrivalTime: value }))}
+                            className={`rounded-xl border px-3 py-2 text-sm font-medium ${plannerState.arrivalTime === value ? "border-[#7db29d] bg-[#effaf3] text-[#18372f]" : "border-[#e5ece6] bg-[#fbfdfb] text-[#364d45]"}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="rounded-xl border border-[#e8efe9] bg-[#f8fbf9] p-2 text-xs text-[#486055]">
+                        {getPlanOpeningHoursSummary()}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentPlannerStep === "summary" && (
+                    <div className="flex flex-col">
+                      <div className="min-h-0 max-h-[min(280px,calc(100dvh-420px))] overflow-y-auto pr-2 sm:max-h-[min(320px,calc(100dvh-400px))]">
+                        <div className="space-y-3">
+                          {plannerResult ? (
+                            <>
+                              <div className="rounded-xl border border-[#e4efe6] bg-[#f7faf7] p-3 text-sm text-[#21352d]">
+                                <div className="mb-1 font-semibold">{plannerResult.summary}</div>
+                                <div className="text-xs text-[#496159]">{plannerResult.reason}</div>
+                              </div>
+
+                              <div className="space-y-2">
+                                {plannerResult.slots.map((slot, index) => (
+                                  <div key={`${slot.title}-${index}`} className="rounded-xl border border-[#e5ece7] bg-[#f9fbfa] p-2">
+                                    <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.12em] text-[#51685d]">
+                                      <span>{slot.time}</span>
+                                      {slot.badge && <span>{slot.badge}</span>}
+                                    </div>
+                                    <div className="mt-1 font-medium text-[#1c2d27]">{slot.title}</div>
+                                    <div className="text-[11px] text-[#4d665b]">{slot.description}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-sm text-[#2f453d]">Review your choices and create a personalized itinerary.</div>
+                          )}
+                        </div>
+                        <div className="h-2" />
+                      </div>
+                      {plannerResult && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => setPlannerResult(buildPlanFromCurrentState())} className="rounded-full border border-[#d8e6d9] bg-[#f0faf4] px-3 py-1.5 text-[11px] font-semibold text-[#1e352d]">🔄 Create Another Plan</button>
+                          <button type="button" onClick={() => setPlannerState((current) => ({ ...current, step: "preferences" }))} className="rounded-full border border-[#d8e6d9] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1e352d]">✏️ Change Preferences</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentIndex = plannerStepOrder.indexOf(plannerState.step);
+                        if (currentIndex > 0) {
+                          updatePlannerStep(plannerStepOrder[currentIndex - 1]);
+                        }
+                      }}
+                      className="rounded-full border border-[#d6e6d8] bg-white px-3 py-1.5 text-xs font-medium text-[#263d34]"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (plannerState.step === "summary") {
+                          // Summary adımında Create Plan basılırsa, rezervasyon sayfasına git
+                          router.push("/book");
+                          return;
+                        }
+                        const currentIndex = plannerStepOrder.indexOf(plannerState.step);
+                        if (currentIndex < plannerStepOrder.length - 1) {
+                          updatePlannerStep(plannerStepOrder[currentIndex + 1]);
+                          if (plannerState.step === "arrival") {
+                            finalizePlanner();
+                          }
+                        } else {
+                          finalizePlanner();
+                        }
+                      }}
+                      className="rounded-full bg-gradient-to-r from-[#dff4eb] to-[#e0ebff] px-3 py-1.5 text-xs font-semibold text-[#1a2d26]"
+                    >
+                      {currentPlannerStep === "summary" ? "Create Plan" : "Next"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Input Area */}
               <div className="mt-3 shrink-0 rounded-2xl border border-[#e2ebdf] bg-white/80 p-2 shadow-[0_10px_24px_rgba(18,33,28,0.05)]">

@@ -5,8 +5,17 @@ import { DEFAULT_LANGUAGE, normalizeLanguageCode, translations, type LanguageCod
 
 const STORAGE_KEY = "chamlija-language";
 
-type TranslationValue = string | Record<string, any> | undefined;
-type TranslationFn = (path: string, fallback?: string) => string;
+type TranslationValue =
+  | string
+  | string[]
+  | Array<Record<string, any>>
+  | Record<string, any>
+  | undefined;
+
+type TranslationFn = <T extends string | string[] | Array<Record<string, any>>>(
+  path: string,
+  fallback?: T,
+) => T;
 
 type LanguageContextValue = {
   language: LanguageCode;
@@ -50,14 +59,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(normalizeLanguageCode(value));
   }, []);
 
-  const t = useCallback<TranslationFn>((path, fallback = "") => {
+  const t = useCallback<TranslationFn>((path, fallback = "" as any) => {
     const direct = resolveTranslation(language, path);
-    if (typeof direct === "string") return direct;
+    if (typeof direct === "string" || Array.isArray(direct)) return direct as any;
 
     const defaultValue = resolveTranslation(DEFAULT_LANGUAGE, path);
-    if (typeof defaultValue === "string") return defaultValue;
+    if (typeof defaultValue === "string" || Array.isArray(defaultValue)) return defaultValue as any;
 
-    return fallback;
+    return fallback as any;
   }, [language]);
 
   const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);

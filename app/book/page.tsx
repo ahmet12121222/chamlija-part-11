@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ProductRecord } from "@/lib/products/types";
 import { BOOKING_TIME_SLOTS } from "@/lib/booking/hours";
 import { calculateBookingPriceBreakdown, formatCurrency } from "@/lib/booking/pricing";
@@ -28,6 +28,41 @@ const PRODUCT_CATEGORY_LABELS: Record<string, string> = {
   photo_shoot: "Photo Shoots",
   free_activity: "Free Activities",
 };
+
+function BookingPrefill({
+  products,
+  setForm,
+}: {
+  products: ProductRecord[];
+  setForm: Dispatch<SetStateAction<typeof initialForm>>;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const areaParam = searchParams.get("area");
+    const adultsParam = searchParams.get("adults");
+    const childrenParam = searchParams.get("children3Plus");
+    const dateHint = searchParams.get("dateHint");
+
+    if (!areaParam && !adultsParam && !childrenParam && !dateHint) {
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      adults: adultsParam ?? previous.adults,
+      children3Plus: childrenParam ?? previous.children3Plus,
+      picnicAreaId: areaParam
+        ? products.some((product) => product.name === areaParam)
+          ? products.find((product) => product.name === areaParam)?.id ?? previous.picnicAreaId
+          : previous.picnicAreaId
+        : previous.picnicAreaId,
+      bookingDate: dateHint ? previous.bookingDate || "" : previous.bookingDate,
+    }));
+  }, [products, searchParams, setForm]);
+
+  return null;
+}
 
 export default function BookingPage() {
   const router = useRouter();
@@ -368,7 +403,12 @@ export default function BookingPage() {
   }
 
   return (
-    <main className="booking-ui min-h-screen bg-cream px-3 py-6 text-charcoal sm:px-6 lg:px-8 lg:py-10">
+    <>
+      <Suspense fallback={null}>
+        <BookingPrefill products={products} setForm={setForm} />
+      </Suspense>
+
+      <main className="booking-ui min-h-screen bg-cream px-3 py-6 text-charcoal sm:px-6 lg:px-8 lg:py-10">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <Link
@@ -823,5 +863,6 @@ export default function BookingPage() {
         </form>
       </div>
     </main>
+    </>
   );
 }

@@ -1,17 +1,20 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/components/site/language-provider";
 import type { Promotion } from "@/lib/promotions/types";
 
-function formatDate(date: string | null): string {
+function formatDate(date: string | null, t: (key: string, fallback: string) => string): string {
   if (!date) {
-    return "Not specified";
+    return t("common.notSpecified", "Not specified");
   }
 
   const normalizedDate = date.includes("T") ? date.split("T")[0] : date;
   const [year, month, day] = normalizedDate.split("-").map(Number);
 
   if (!year || !month || !day) {
-    return "Not specified";
+    return t("common.notSpecified", "Not specified");
   }
 
   const parsedDate = new Date(Date.UTC(year, month - 1, day));
@@ -24,8 +27,9 @@ function formatDate(date: string | null): string {
 }
 
 export function PromotionCard({ promotion }: { promotion: Promotion }) {
+  const { t } = useLanguage();
   const imageUrl = promotion.image_url || "/chamlija/20.jpeg";
-  const discountText = promotion.discount == null ? "Özel teklif" : `%${String(promotion.discount)}`;
+  const discountText = promotion.discount == null ? t("promotions.specialOffer", "Special offer") : `%${String(promotion.discount)}`;
 
   return (
     <article className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_16px_35px_rgba(15,23,42,0.05)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
@@ -47,7 +51,7 @@ export function PromotionCard({ promotion }: { promotion: Promotion }) {
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
             {promotion.category}
           </span>
-          <span className="text-xs font-medium text-slate-500">Aktif</span>
+          <span className="text-xs font-medium text-slate-500">{t("promotions.active", "Active")}</span>
         </div>
 
         <div>
@@ -56,9 +60,9 @@ export function PromotionCard({ promotion }: { promotion: Promotion }) {
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm text-slate-600">
-          <span>Geçerlilik</span>
+          <span>{t("promotions.validity", "Validity")}</span>
           <span className="font-semibold text-slate-900">
-            {formatDate(promotion.start_date)} - {formatDate(promotion.end_date)}
+            {formatDate(promotion.start_date, t)} - {formatDate(promotion.end_date, t)}
           </span>
         </div>
 
@@ -66,7 +70,7 @@ export function PromotionCard({ promotion }: { promotion: Promotion }) {
           href={`/promotions/${promotion.id}`}
           className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
         >
-          Detay
+          {t("promotions.details", "Details")}
         </Link>
       </div>
     </article>

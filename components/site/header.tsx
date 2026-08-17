@@ -82,19 +82,31 @@ export function SiteHeader() {
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
-        <Link href="/" className="flex items-center gap-3" onClick={() => setIsMenuOpen(false)}>
-          <div
-            className={`flex h-10 w-10 items-center justify-center rounded-full border text-base font-bold transition-colors duration-500 ${
-              transparentMode ? "border-white/45 bg-white/10 text-white" : "border-[#19352a]/20 bg-[#19352a] text-[#f4efe5]"
-            }`}
-          >
-            C
-          </div>
-          <div>
+        <Link
+          href="/"
+          className="flex items-center transition-transform duration-200 active:scale-[0.98] sm:hover:scale-[1.02]"
+          onClick={() => setIsMenuOpen(false)}
+          aria-label="Go to homepage"
+        >
+          <div className="select-none leading-none">
             <p
-              className={`text-sm font-semibold uppercase tracking-[0.26em] transition-colors duration-500 ${
+              className={`text-[15px] font-black uppercase tracking-[0.28em] transition-all duration-300 sm:text-[18px] ${
                 transparentMode ? "text-white" : "text-[#14251d]"
               }`}
+              style={{ letterSpacing: "0.24em" }}
+            >
+              Buyuk
+            </p>
+            <div
+              className={`mt-1 h-px w-full origin-left transition-all duration-300 ${
+                transparentMode ? "bg-white/35" : "bg-[#19352a]/30"
+              }`}
+            />
+            <p
+              className={`pt-1 text-[11px] font-semibold uppercase tracking-[0.5em] transition-all duration-300 sm:text-[12px] ${
+                transparentMode ? "text-white/80" : "text-[#19352a]"
+              }`}
+              style={{ letterSpacing: "0.46em" }}
             >
               Chamlija
             </p>
