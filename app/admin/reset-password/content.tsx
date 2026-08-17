@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
+
 import { supabase } from "@/lib/supabase/client";
 
 export default function ResetPasswordContent() {
@@ -15,23 +16,64 @@ export default function ResetPasswordContent() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let isActive = true;
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isActive) {
+        return;
+      }
+
+      if (event === "PASSWORD_RECOVERY" && session) {
+        setIsValidSession(true);
+        setError(null);
+        setIsChecking(false);
+        return;
+      }
+
+      if (event === "SIGNED_OUT" && !session) {
+        setIsValidSession(false);
+      }
+    });
+
     async function checkRecoverySession() {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error: sessionError } = await supabase.auth.getSession();
 
-        if (data.session && data.session.user && data.session.user.recovery_sent_at) {
+        if (!isActive) {
+          return;
+        }
+
+        if (sessionError) {
+          setError(sessionError.message);
+          setIsValidSession(false);
+          setIsChecking(false);
+          return;
+        }
+
+        if (data.session && data.session.user && (data.session.user.recovery_sent_at || data.session.user.email)) {
           setIsValidSession(true);
         } else {
           setError("Invalid or expired recovery link. Please request a new password reset.");
+          setIsValidSession(false);
         }
-      } catch (err) {
-        setError("Unable to validate recovery session.");
+      } catch (checkError) {
+        if (isActive) {
+          setError(checkError instanceof Error ? checkError.message : "Unable to validate recovery session.");
+          setIsValidSession(false);
+        }
       } finally {
-        setIsChecking(false);
+        if (isActive) {
+          setIsChecking(false);
+        }
       }
     }
 
-    checkRecoverySession();
+    void checkRecoverySession();
+
+    return () => {
+      isActive = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -53,18 +95,15 @@ export default function ResetPasswordContent() {
         throw new Error("Passwords do not match.");
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
-      });
+      const { error: updateError } = await supabase.auth.updateUser({ password });
 
       if (updateError) {
         throw new Error(updateError.message || "Unable to update password.");
       }
 
-      setMessage("Password updated successfully. Redirecting to login...");
-      setTimeout(() => {
-        router.push("/admin/login");
-      }, 2000);
+      setMessage("Password updated successfully. Redirecting to sign in...");
+      router.push("/admin/login");
+      router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to reset password.");
     } finally {

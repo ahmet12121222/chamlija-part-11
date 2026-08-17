@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -68,16 +69,6 @@ export default function AdminLoginPage() {
             />
           </label>
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => router.push("/admin/forgot-password")}
-              className="text-sm text-emerald-700 transition hover:text-emerald-800 hover:underline"
-            >
-              Forgot password?
-            </button>
-          </div>
-
           {error && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
           )}
@@ -89,6 +80,15 @@ export default function AdminLoginPage() {
           >
             {isSubmitting ? "Signing in..." : "Sign in to admin"}
           </button>
+
+          <div className="text-center">
+            <Link
+              href="/admin/forgot-password"
+              className="text-sm font-medium text-emerald-700 transition hover:text-emerald-800"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </form>
       </div>
     </main>

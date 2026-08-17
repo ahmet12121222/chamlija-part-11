@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+
 import ResetPasswordContent from "./content";
 
 export default function ResetPasswordPage() {
@@ -22,4 +23,3 @@ function ResetPasswordLoading() {
     </main>
   );
 }
-
