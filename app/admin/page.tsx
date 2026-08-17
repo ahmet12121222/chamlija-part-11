@@ -51,7 +51,7 @@ export default async function AdminDashboardPage({
     ? (
         await supabaseAdmin
           .from("payments")
-          .select("id, amount, refund_amount, status, provider, payment_method")
+          .select("id, amount, refund_amount, status, provider, payment_method, receipt_url, receipt_file_name, review_status, reviewed_at, review_note")
           .eq("booking_id", selectedBooking.id)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -199,14 +199,10 @@ export default async function AdminDashboardPage({
             </div>
 
             {/* Manual Payment Confirmation */}
-            {["bank_transfer", "cash_at_gate"].includes(selectedBooking.payment_method) && selectedBooking.payment_status !== "paid" && (
+            {selectedBooking.payment_method === "cash_at_gate" && selectedBooking.payment_status !== "paid" && (
               <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="text-sm font-semibold text-emerald-900">Confirm Payment Received</div>
-                <p className="mt-2 text-sm text-emerald-800">
-                  {selectedBooking.payment_method === "bank_transfer"
-                    ? "Has the customer completed their bank transfer? Click below to confirm payment received."
-                    : "Did the customer pay cash at the gate? Click below to confirm payment received."}
-                </p>
+                <p className="mt-2 text-sm text-emerald-800">Did the customer pay cash at the gate? Click below to confirm payment received.</p>
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                   <form action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST">
                     <button
@@ -217,6 +213,54 @@ export default async function AdminDashboardPage({
                     </button>
                   </form>
                 </div>
+              </div>
+            )}
+
+            {selectedBooking.payment_method === "bank_transfer" && (
+              <div className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <div className="text-sm font-semibold text-sky-900">Bank transfer review</div>
+                <p className="mt-2 text-sm text-sky-800">Review the proof of payment upload before approving the booking.</p>
+
+                {selectedPayment?.receipt_url ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-sky-200 bg-white p-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">Uploaded file</div>
+                      <div className="mt-1">{selectedPayment.receipt_file_name || "Bank transfer receipt"}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={selectedPayment.receipt_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                      >
+                        Open receipt
+                      </a>
+                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                        <input type="hidden" name="action" value="approve" />
+                        <button type="submit" className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700">
+                          Approve payment
+                        </button>
+                      </form>
+                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                        <input type="hidden" name="action" value="reject" />
+                        <button type="submit" className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">
+                          Reject receipt
+                        </button>
+                      </form>
+                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                        <input type="hidden" name="action" value="resubmit" />
+                        <button type="submit" className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50">
+                          Request new receipt
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-dashed border-sky-200 bg-white p-3 text-sm text-sky-700">
+                    No proof of payment uploaded yet.
+                  </div>
+                )}
               </div>
             )}
 

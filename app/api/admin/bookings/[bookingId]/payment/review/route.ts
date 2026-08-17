@@ -1,0 +1,187 @@
+import { NextResponse } from "next/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { requireAdminAccess } from "@/lib/auth/admin";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ bookingId: string }> },
+) {
+  try {
+    await requireAdminAccess();
+
+    const { bookingId } = await params;
+    const formData = await request.formData();
+    const action = String(formData.get("action") ?? "").trim();
+    const adminNote = String(formData.get("adminNote") ?? "").trim();
+    const rejectionReason = String(formData.get("rejectionReason") ?? "").trim();
+
+    if (!bookingId) {
+      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from("bookings")
+      .select("id, payment_method, payment_status, booking_status, total_price")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingError || !booking) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    if (booking.payment_method !== "bank_transfer") {
+      return NextResponse.json({ error: "This booking does not use bank transfer" }, { status: 400 });
+    }
+
+    const { data: payment, error: paymentLookupError } = await supabaseAdmin
+      .from("payments")
+      .select("id, status, review_status, review_note, rejection_reason")
+      .eq("booking_id", bookingId)
+      .eq("provider", "manual")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (paymentLookupError) {
+      return NextResponse.json({ error: paymentLookupError.message }, { status: 500 });
+    }
+
+    const previousStatus = payment?.status ?? booking.payment_status ?? "pending_payment";
+    const adminUser = (await supabaseAdmin.auth.getUser()).data.user;
+    const auditNote = adminNote || payment?.review_note || "Reviewed by admin.";
+
+    if (action === "approve") {
+      const { error: bookingUpdateError } = await supabaseAdmin
+        .from("bookings")
+        .update({
+          payment_status: "verified",
+          booking_status: "confirmed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId);
+
+      if (bookingUpdateError) {
+        return NextResponse.json({ error: bookingUpdateError.message }, { status: 500 });
+      }
+
+      const { error: paymentError } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "verified",
+          review_status: "verified",
+          reviewed_at: new Date().toISOString(),
+          review_note: auditNote,
+          rejection_reason: null,
+          verified_by: adminUser?.id ?? null,
+          verified_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("booking_id", bookingId)
+        .eq("provider", "manual");
+
+      if (paymentError) {
+        return NextResponse.json({ error: paymentError.message }, { status: 500 });
+      }
+
+      await supabaseAdmin.from("payment_audit_logs").insert({
+        payment_id: payment?.id ?? null,
+        booking_id: bookingId,
+        admin_user_id: adminUser?.id ?? null,
+        previous_status: previousStatus,
+        new_status: "verified",
+        admin_note: auditNote,
+        rejection_reason: null,
+      });
+
+      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+    }
+
+    if (action === "reject") {
+      const finalReason = rejectionReason || "Invalid receipt";
+      const { error: paymentError } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "rejected",
+          review_status: "rejected",
+          reviewed_at: new Date().toISOString(),
+          review_note: auditNote,
+          rejection_reason: finalReason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("booking_id", bookingId)
+        .eq("provider", "manual");
+
+      if (paymentError) {
+        return NextResponse.json({ error: paymentError.message }, { status: 500 });
+      }
+
+      await supabaseAdmin
+        .from("bookings")
+        .update({
+          payment_status: "rejected",
+          booking_status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId);
+
+      await supabaseAdmin.from("payment_audit_logs").insert({
+        payment_id: payment?.id ?? null,
+        booking_id: bookingId,
+        admin_user_id: adminUser?.id ?? null,
+        previous_status: previousStatus,
+        new_status: "rejected",
+        admin_note: auditNote,
+        rejection_reason: finalReason,
+      });
+
+      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+    }
+
+    if (action === "resubmit") {
+      const finalReason = rejectionReason || "Please upload a clearer receipt.";
+      const { error: paymentError } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "receipt_required",
+          review_status: "receipt_required",
+          reviewed_at: new Date().toISOString(),
+          review_note: auditNote,
+          rejection_reason: finalReason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("booking_id", bookingId)
+        .eq("provider", "manual");
+
+      if (paymentError) {
+        return NextResponse.json({ error: paymentError.message }, { status: 500 });
+      }
+
+      await supabaseAdmin
+        .from("bookings")
+        .update({
+          payment_status: "receipt_required",
+          booking_status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId);
+
+      await supabaseAdmin.from("payment_audit_logs").insert({
+        payment_id: payment?.id ?? null,
+        booking_id: bookingId,
+        admin_user_id: adminUser?.id ?? null,
+        previous_status: previousStatus,
+        new_status: "receipt_required",
+        admin_note: auditNote,
+        rejection_reason: finalReason,
+      });
+
+      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+    }
+
+    return NextResponse.json({ error: "Invalid review action" }, { status: 400 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -26,8 +26,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Only allow confirming payment for bank_transfer or cash_at_gate methods
-    if (!["bank_transfer", "cash_at_gate"].includes(booking.payment_method)) {
+    // Only allow confirming payment for cash_at_gate method. Bank transfers require the review flow with receipt verification.
+    if (booking.payment_method === "bank_transfer") {
+      return NextResponse.json({ error: "Bank transfer payments must be reviewed using the receipt verification flow." }, { status: 400 });
+    }
+
+    if (booking.payment_method !== "cash_at_gate") {
       return NextResponse.json({ error: "This booking does not use manual payment" }, { status: 400 });
     }
 

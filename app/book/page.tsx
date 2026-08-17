@@ -224,9 +224,7 @@ export default function BookingPage() {
       nextErrors.guests = "At least one paying or free guest must be present.";
     }
 
-    if (!form.picnicAreaId) {
-      nextErrors.picnicAreaId = "Please select a picnic area.";
-    } else if (selectedArea && selectedArea.capacity !== null && selectedArea.capacity !== undefined && totalGuests > Number(selectedArea.capacity)) {
+    if (selectedArea && selectedArea.capacity !== null && selectedArea.capacity !== undefined && totalGuests > Number(selectedArea.capacity)) {
       nextErrors.picnicAreaId = "This picnic area cannot accommodate the selected guest count.";
     }
 
@@ -251,8 +249,20 @@ export default function BookingPage() {
       return;
     }
 
-    if (!form.bookingDate || !form.bookingTime || !form.picnicAreaId) {
-      setErrors({ bookingDate: "Please provide a valid date and area.", picnicAreaId: "Please choose a picnic area." });
+    if (!form.bookingDate || !form.bookingTime) {
+      setErrors({ bookingDate: "Please provide a valid date and time." });
+      return;
+    }
+
+    if (!form.picnicAreaId) {
+      setAvailabilityState({
+        checking: false,
+        message: "No picnic area selected. You can continue without one, or choose a picnic area to check availability.",
+        isAvailable: null,
+        availableSlots: [],
+        suggestedDates: [],
+        error: null,
+      });
       return;
     }
 
@@ -341,7 +351,7 @@ export default function BookingPage() {
       return;
     }
 
-    if (availabilityState.isAvailable !== true) {
+    if (form.picnicAreaId && availabilityState.isAvailable !== true) {
       setAvailabilityState((previous) => ({
         ...previous,
         checking: false,
@@ -371,7 +381,7 @@ export default function BookingPage() {
         adults,
         children_3_plus: children3Plus,
         children_under_3: childrenUnder3,
-        picnic_area_id: form.picnicAreaId,
+        picnic_area_id: form.picnicAreaId || null,
         customer_notes: form.customerNotes,
         selected_equipment_ids: selectedEquipmentIds,
         selected_paid_activity_id: selectedPaidActivityId || null,
@@ -533,7 +543,7 @@ export default function BookingPage() {
                 {errors.guests && <p className="text-sm text-terracotta">{errors.guests}</p>}
 
                 <div>
-                  <label htmlFor="picnicAreaId" className="mb-2 block text-sm font-semibold text-charcoal/80">Picnic Area</label>
+                  <label htmlFor="picnicAreaId" className="mb-2 block text-sm font-semibold text-charcoal/80">Picnic Area <span className="font-normal text-charcoal/50">(optional)</span></label>
                   {loadingProducts ? (
                     <div className="border border-forest/15 bg-cream/40 px-4 py-3 text-sm text-charcoal/60">Loading picnic areas...</div>
                   ) : productError ? (

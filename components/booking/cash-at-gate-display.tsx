@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { formatCurrency } from "@/lib/payments/manual";
 import type { BookingPaymentSummary } from "@/lib/payments/manual";
 
@@ -9,48 +11,66 @@ interface CashAtGateDisplayProps {
 
 export function CashAtGateDisplay({ booking }: CashAtGateDisplayProps) {
   const reservationCode = booking.reservation_code || booking.id;
+  const [copied, setCopied] = useState(false);
+
+  const copyReference = async () => {
+    try {
+      await navigator.clipboard.writeText(reservationCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch (error) {
+      console.error("Clipboard copy failed:", error);
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Confirmation Card */}
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-        <div className="text-2xl font-black text-emerald-700">✓</div>
-        <div className="mt-3 text-lg font-semibold text-emerald-900">Reservation Received</div>
-        <p className="mt-2 text-sm text-emerald-800">Your reservation has been received successfully. Payment will be made in cash when you arrive at Chamlija.</p>
+    <div className="space-y-5">
+      <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5 text-center shadow-[0_18px_34px_rgba(16,185,129,0.08)]">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl font-black text-emerald-700">✓</div>
+        <div className="mt-4 text-2xl font-bold text-emerald-900">Reservation Received</div>
+        <p className="mt-2 text-sm leading-6 text-emerald-800">
+          Your reservation has been received successfully. Payment will be made in cash when you arrive at Chamlija.
+        </p>
       </div>
 
-      {/* Booking Summary */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking Summary</div>
+      <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_16px_36px_rgba(15,23,42,0.04)] sm:p-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Booking Details</div>
 
         <div className="mt-4 space-y-3">
-          {/* Booking Reference */}
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <span className="text-sm text-slate-600">Booking Reference:</span>
-            <span className="font-mono font-semibold text-slate-900">{reservationCode}</span>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Booking Reference</div>
+              <button
+                type="button"
+                onClick={copyReference}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                aria-label="Copy booking reference"
+              >
+                <span aria-hidden="true">⧉</span>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <div className="mt-2 font-mono text-lg font-black tracking-tight text-slate-900">{reservationCode}</div>
           </div>
 
-          {/* Booking Date */}
           {booking.booking_date && (
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <span className="text-sm text-slate-600">Booking Date:</span>
-              <span className="font-medium text-slate-900">{booking.booking_date}</span>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Date</div>
+              <div className="mt-1 text-base font-semibold text-slate-900">{booking.booking_date}</div>
             </div>
           )}
 
-          {/* Booking Time */}
           {booking.booking_time && (
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <span className="text-sm text-slate-600">Booking Time:</span>
-              <span className="font-medium text-slate-900">{booking.booking_time}</span>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
+              <div className="mt-1 text-base font-semibold text-slate-900">{booking.booking_time}</div>
             </div>
           )}
 
-          {/* Number of Guests */}
           {(booking.adults || booking.children_3_plus || booking.children_under_3) && (
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <span className="text-sm text-slate-600">Guests:</span>
-              <span className="font-medium text-slate-900">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Guests</div>
+              <div className="mt-1 text-base font-semibold text-slate-900">
                 {[
                   booking.adults ? `${booking.adults} Adult${booking.adults > 1 ? "s" : ""}` : "",
                   booking.children_3_plus ? `${booking.children_3_plus} Child${booking.children_3_plus > 1 ? "ren" : ""} 3+` : "",
@@ -58,66 +78,50 @@ export function CashAtGateDisplay({ booking }: CashAtGateDisplayProps) {
                 ]
                   .filter(Boolean)
                   .join(", ")}
-              </span>
+              </div>
             </div>
           )}
 
-          {/* Amount to Pay */}
-          <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-            <span className="font-semibold text-emerald-900">Amount to Pay:</span>
-            <span className="font-mono text-lg font-bold text-emerald-700">{formatCurrency(booking.total_price)}</span>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Amount to Pay</div>
+            <div className="mt-1 text-2xl font-black tracking-tight text-emerald-900">{formatCurrency(booking.total_price)}</div>
           </div>
         </div>
       </div>
 
-      {/* Payment Instructions */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">What Happens Next</div>
+      <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_16px_36px_rgba(15,23,42,0.04)] sm:p-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">What Happens Next</div>
 
         <ol className="mt-4 space-y-3">
           <li className="flex gap-3">
             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">1</span>
-            <div>
-              <div className="font-medium text-slate-900">Save Your Booking Reference</div>
-              <p className="mt-0.5 text-sm text-slate-600">Write down or screenshot your booking reference number ({reservationCode})</p>
-            </div>
+            <div className="text-sm text-slate-700">Keep your booking reference ready for your arrival.</div>
           </li>
-
           <li className="flex gap-3">
             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">2</span>
-            <div>
-              <div className="font-medium text-slate-900">Arrive at Chamlija</div>
-              <p className="mt-0.5 text-sm text-slate-600">Come to the gate at your scheduled booking time</p>
-            </div>
+            <div className="text-sm text-slate-700">Arrive at Chamlija at your scheduled booking time.</div>
           </li>
-
           <li className="flex gap-3">
             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">3</span>
-            <div>
-              <div className="font-medium text-slate-900">Pay in Cash</div>
-              <p className="mt-0.5 text-sm text-slate-600">Pay {formatCurrency(booking.total_price)} in cash to our staff at the gate</p>
-            </div>
-          </li>
-
-          <li className="flex gap-3">
-            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">4</span>
-            <div>
-              <div className="font-medium text-slate-900">Enjoy Your Visit</div>
-              <p className="mt-0.5 text-sm text-slate-600">Our team will welcome you and help you get started</p>
-            </div>
+            <div className="text-sm text-slate-700">Pay {formatCurrency(booking.total_price)} in cash at the gate.</div>
           </li>
         </ol>
       </div>
 
-      {/* Important Notes */}
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-        <div className="text-sm font-semibold text-amber-900">Important</div>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
-          <li>Please arrive on time for your booking</li>
-          <li>We accept cash only for gate payments</li>
-          <li>Have your booking reference ready when you arrive</li>
-          <li>Your booking is confirmed but payment not yet received</li>
-        </ul>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={copyReference}
+          className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+        >
+          {copied ? "Copied!" : "Copy Booking Reference"}
+        </button>
+        <Link
+          href="/"
+          className="inline-flex flex-1 items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(16,185,129,0.18)] transition hover:bg-emerald-700"
+        >
+          Back to Home
+        </Link>
       </div>
     </div>
   );

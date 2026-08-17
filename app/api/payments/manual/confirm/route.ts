@@ -16,12 +16,14 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = getSupabaseAdminClient();
 
-    // Step 1: Update booking with payment method and set status to pending
+    const isBankTransfer = paymentMethod === "bank_transfer";
+
     const { data: bookingData, error: updateError } = await supabaseAdmin
       .from("bookings")
       .update({
         payment_method: paymentMethod,
-        payment_status: "pending",
+        payment_status: isBankTransfer ? "pending_payment" : "pending",
+        booking_status: isBankTransfer ? "pending" : "pending",
       })
       .eq("id", bookingId)
       .select("id, total_price");
@@ -38,7 +40,6 @@ export async function POST(request: Request) {
     const booking = bookingData[0];
     const totalPrice = Number(booking.total_price) || 0;
 
-    // Step 2: Check if payment record exists for this booking
     const { data: existingPayment, error: checkError } = await supabaseAdmin
       .from("payments")
       .select("id")
@@ -52,15 +53,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Failed to check payment record: ${checkError.message}` }, { status: 500 });
     }
 
-    // Step 3: Update or create payment record
     if (existingPayment) {
-      // Update existing payment record
       const { error: paymentUpdateError } = await supabaseAdmin
         .from("payments")
         .update({
           amount: totalPrice,
           currency: "ZAR",
-          status: "pending",
+          status: isBankTransfer ? "pending_payment" : "pending",
+          review_status: isBankTransfer ? "pending" : null,
+          review_note: isBankTransfer ? "Awaiting transfer receipt upload and manual verification." : null,
           refund_amount: 0,
           updated_at: new Date().toISOString(),
         })
@@ -71,7 +72,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Failed to update payment record: ${paymentUpdateError.message}` }, { status: 500 });
       }
     } else {
-      // Create new payment record
       const { error: paymentInsertError } = await supabaseAdmin.from("payments").insert({
         booking_id: bookingId,
         provider: "manual",
@@ -79,7 +79,9 @@ export async function POST(request: Request) {
         provider_reference: null,
         amount: totalPrice,
         currency: "ZAR",
-        status: "pending",
+        status: isBankTransfer ? "pending_payment" : "pending",
+        review_status: isBankTransfer ? "pending" : null,
+        review_note: isBankTransfer ? "Awaiting transfer receipt upload and manual verification." : null,
         refund_amount: 0,
       });
 

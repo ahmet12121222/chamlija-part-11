@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const selectedTentAreaId = typeof body.selected_tent_area_id === "string" ? body.selected_tent_area_id.trim() : null;
     const selectedPhotoShootId = typeof body.selected_photo_shoot_id === "string" ? body.selected_photo_shoot_id.trim() : null;
 
-    if (!fullName || !phoneNumber || !email || !bookingDate || !bookingTime || !areaId) {
+    if (!fullName || !phoneNumber || !email || !bookingDate || !bookingTime) {
       return NextResponse.json({ error: "All required booking fields must be provided." }, { status: 400 });
     }
 
@@ -64,21 +64,37 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = getSupabaseAdminClient();
 
-    const { data: area, error: areaError } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .eq("id", areaId)
-      .eq("category", "picnic_area")
-      .eq("is_active", true)
-      .eq("is_bookable", true)
-      .maybeSingle();
+    let area: { id: string; name: string; price?: number | null; capacity?: number | null } | null = null;
 
-    if (areaError || !area) {
-      return NextResponse.json({ error: "The selected picnic area is unavailable." }, { status: 400 });
-    }
+    if (areaId) {
+      const { data: areaRecord, error: areaError } = await supabaseAdmin
+        .from("products")
+        .select("*")
+        .eq("id", areaId)
+        .eq("category", "picnic_area")
+        .eq("is_active", true)
+        .eq("is_bookable", true)
+        .maybeSingle();
 
-    if (area.capacity !== null && area.capacity !== undefined && adults + children3Plus + childrenUnder3 > Number(area.capacity)) {
-      return NextResponse.json({ error: "The selected picnic area cannot accommodate your party size." }, { status: 400 });
+      if (areaError) {
+        return NextResponse.json({ error: areaError.message }, { status: 500 });
+      }
+
+      if (!areaRecord) {
+        return NextResponse.json({ error: "The selected picnic area is unavailable." }, { status: 400 });
+      }
+
+      const selectedArea = areaRecord as {
+        id: string;
+        name: string;
+        price?: number | null;
+        capacity?: number | null;
+      };
+      area = selectedArea;
+
+      if (selectedArea.capacity !== null && selectedArea.capacity !== undefined && adults + children3Plus + childrenUnder3 > Number(selectedArea.capacity)) {
+        return NextResponse.json({ error: "The selected picnic area cannot accommodate your party size." }, { status: 400 });
+      }
     }
 
     const selectedProductIds = [
@@ -152,26 +168,28 @@ export async function POST(request: Request) {
 
     const finalTotal = finalBreakdown.total;
 
-    const { data: conflictingBookings, error: conflictError } = await supabaseAdmin
-      .from("bookings")
-      .select("id")
-      .eq("selected_area_id", areaId)
-      .eq("booking_date", bookingDate)
-      .eq("booking_time", bookingTime)
-      .in("booking_status", ["pending", "confirmed"]);
+    if (areaId) {
+      const { data: conflictingBookings, error: conflictError } = await supabaseAdmin
+        .from("bookings")
+        .select("id")
+        .eq("selected_area_id", areaId)
+        .eq("booking_date", bookingDate)
+        .eq("booking_time", bookingTime)
+        .in("booking_status", ["pending", "confirmed"]);
 
-    if (conflictError) {
-      return NextResponse.json({ error: conflictError.message }, { status: 500 });
-    }
+      if (conflictError) {
+        return NextResponse.json({ error: conflictError.message }, { status: 500 });
+      }
 
-    if ((conflictingBookings ?? []).length > 0) {
-      return NextResponse.json({ error: "Unfortunately, this time slot is unavailable." }, { status: 409 });
+      if ((conflictingBookings ?? []).length > 0) {
+        return NextResponse.json({ error: "Unfortunately, this time slot is unavailable." }, { status: 409 });
+      }
     }
 
     const { data: productCapacityRows, error: capacityError } = await supabaseAdmin
       .from("products")
       .select("id, capacity, category")
-      .in("id", [areaId, ...validatedProductIds]);
+      .in("id", areaId ? [areaId, ...validatedProductIds] : validatedProductIds);
 
     if (capacityError) {
       return NextResponse.json({ error: capacityError.message }, { status: 500 });
@@ -179,7 +197,7 @@ export async function POST(request: Request) {
 
     const productCapacityMap = new Map((productCapacityRows ?? []).map((row) => [row.id, row]));
 
-    for (const productId of [areaId, ...validatedProductIds]) {
+    for (const productId of areaId ? [areaId, ...validatedProductIds] : validatedProductIds) {
       const capProduct = productCapacityMap.get(productId);
       if (!capProduct) continue;
 
@@ -205,7 +223,7 @@ export async function POST(request: Request) {
       adults,
       children_3_plus: children3Plus,
       children_under_3: childrenUnder3,
-      selected_area_id: areaId,
+      selected_area_id: areaId || null,
       selected_equipment_ids: selectedEquipmentIds,
       selected_paid_activity_id: selectedPaidActivityId || null,
       selected_tent_area_id: selectedTentAreaId || null,
