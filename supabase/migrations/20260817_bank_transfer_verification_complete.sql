@@ -343,9 +343,9 @@ begin
     using (public.booking_email_matches_session(id))
     with check (
       public.booking_email_matches_session(id)
-      and new.booking_status <> 'confirmed'
-      and new.payment_status <> 'verified'
-      and new.payment_status <> 'paid'
+      and booking_status <> 'confirmed'
+      and payment_status <> 'verified'
+      and payment_status <> 'paid'
     );
   end if;
 end $$;
@@ -365,9 +365,9 @@ begin
     to authenticated
     with check (
       auth.uid() is not null
-      and lower(coalesce(new.email, '')) = lower(coalesce(current_setting('request.jwt.claims', true)::json->>'email', ''))
-      and new.booking_status <> 'confirmed'
-      and new.payment_status not in ('verified', 'paid')
+      and lower(coalesce(email, '')) = lower(coalesce(current_setting('request.jwt.claims', true)::json->>'email', ''))
+      and booking_status <> 'confirmed'
+      and payment_status not in ('verified', 'paid')
     );
   end if;
 end $$;
@@ -440,11 +440,11 @@ begin
     using (public.payment_belongs_to_session(id))
     with check (
       public.payment_belongs_to_session(id)
-      and coalesce(new.status, '') not in ('verified', 'paid')
-      and coalesce(new.review_status, '') not in ('approved', 'verified')
-      and new.verified_by is null
-      and new.verified_at is null
-      and new.review_status in (null, 'pending', 'receipt_uploaded', 'under_review', 'rejected', 'receipt_required', 'manual_review')
+      and coalesce(status, '') not in ('verified', 'paid')
+      and coalesce(review_status, '') not in ('approved', 'verified')
+      and verified_by is null
+      and verified_at is null
+      and review_status in (null, 'pending', 'receipt_uploaded', 'under_review', 'rejected', 'receipt_required', 'manual_review')
     );
   end if;
 end $$;
@@ -467,12 +467,12 @@ begin
       and exists (
         select 1
         from public.bookings b
-        where b.id = new.booking_id
+        where b.id = booking_id
           and lower(coalesce(b.email, '')) = lower(coalesce(current_setting('request.jwt.claims', true)::json->>'email', ''))
       )
-      and new.provider = 'manual'
-      and new.status not in ('verified', 'paid')
-      and coalesce(new.review_status, '') not in ('approved', 'verified')
+      and provider = 'manual'
+      and status not in ('verified', 'paid')
+      and coalesce(review_status, '') not in ('approved', 'verified')
     );
   end if;
 end $$;
