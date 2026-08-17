@@ -238,12 +238,16 @@ export async function createIkhokhaCheckout(
 
   const requestBody = buildIkhokhaCheckoutRequest(booking, callbackUrl, successUrl, failureUrl, cancelUrl);
   const rawBody = JSON.stringify(requestBody);
+  const path = "/public-api/v1/api/payment";
+  const signature = createIkhokhaSignature(path + rawBody, applicationSecret);
 
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/public-api/v1/api/payment`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "IK-APPID": applicationId,
+      "IK-SIGN": signature,
     },
     body: rawBody,
     cache: "no-store",
@@ -324,12 +328,12 @@ export async function getIkhokhaStatus(externalReference?: string | null, paymen
     }
   }
 
-  const statusValue = typeof payload?.durum === "string" ? payload.durum : null;
-  const amountValue = Number(payload && typeof payload.miktar === "number" ? payload.miktar : typeof payload?.miktar === "string" ? payload.miktar : 0);
+  const statusValue = typeof payload?.status === "string" ? payload.status : typeof payload?.durum === "string" ? payload.durum : null;
+  const amountValue = Number(payload && typeof payload.amount === "number" ? payload.amount : typeof payload?.miktar === "number" ? payload.miktar : typeof payload?.amount === "string" ? payload.amount : typeof payload?.miktar === "string" ? payload.miktar : 0);
 
   return {
     ok: response.ok,
-    verified: response.ok && normalizeStatus(statusValue) === "parali",
+    verified: response.ok && (normalizeStatus(statusValue) === "success" || normalizeStatus(statusValue) === "paid"),
     status: statusValue,
     amount: Number.isFinite(amountValue) ? amountValue : null,
     payload,

@@ -699,7 +699,7 @@ export function ChamlijaAIChat() {
                       </div>
                       {plannerResult && (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => setPlannerResult(buildPlanFromCurrentState())} className="rounded-full border border-[#d8e6d9] bg-[#f0faf4] px-3 py-1.5 text-[11px] font-semibold text-[#1e352d]">🔄 Create Another Plan</button>
+                          <button type="button" onClick={() => startPlanWizard()} className="rounded-full border border-[#d8e6d9] bg-[#f0faf4] px-3 py-1.5 text-[11px] font-semibold text-[#1e352d]">🔄 Create Another Plan</button>
                           <button type="button" onClick={() => setPlannerState((current) => ({ ...current, step: "preferences" }))} className="rounded-full border border-[#d8e6d9] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1e352d]">✏️ Change Preferences</button>
                         </div>
                       )}

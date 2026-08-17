@@ -4,6 +4,8 @@
  * Dynamic, intent-based chatbot with playful but practical day planning.
  */
 
+import { formatCurrency } from "@/lib/booking/pricing";
+
 const BOOKING_ROUTE = "/book";
 
 export type ChatResponseType =
@@ -148,6 +150,8 @@ export type UserIntent =
   | "rules"
   | "own-furniture"
   | "group-quote"
+  | "facility-check"
+  | "availability-check"
   | "unknown";
 
 const detectReservationArea = (text: string): string | null => {
@@ -298,6 +302,10 @@ export function detectIntent(input: string): UserIntent {
     return "greeting";
   }
 
+  if (containsAny(normalized, ["otopark", "parking", "car park", "free parking", "mangal", "braai", "barbeque", "bbq", "balik", "fishing", "at binisi", "horse riding", "yemek", "food", "restaurant", "coffee", "cay", "tea", "dondurma", "pankek", "popcorn", "hamburger", "country bazaar", "karinja", "delibite", "amphitheater", "amfitiyatro", "yellow wood", "play park", "oyun alanı", "namaz", "prayer", "ibadet", "salah", "shalat", "tuvalet", "toilet", "wc", "restroom", "helal", "halal", "kosher", "halaal"])) {
+    return "facility-check";
+  }
+
   if (containsAny(normalized, ["nasilsin", "how are you", "how are things", "nasil gidiyor"])) {
     return "how-are-you";
   }
@@ -344,6 +352,10 @@ export function detectIntent(input: string): UserIntent {
 
   if (detectOwnFurnitureQuestion(normalized)) {
     return "own-furniture";
+  }
+
+  if (containsAny(normalized, ["available", "mevcut", "bos", "boş", "uygun", "tarih", "date", "dolu", "reserved", "reserved dates", "available dates", "hangi gunler", "hangi günler", "when can we come", "ne zaman gelebiliriz", "available day", "free day", "ne zaman mevcut"])) {
+    return "availability-check";
   }
 
   return "unknown";
@@ -1090,6 +1102,214 @@ export function generateGroupQuoteResponse(input: string): ChatResponse {
   };
 }
 
+export function generateFacilityCheckResponse(input: string): ChatResponse {
+  const language = getLanguage(input);
+  const normalized = normalize(input);
+
+  const isTurkish = language === "tr";
+  const isEnglish = language === "en";
+
+  if (containsAny(normalized, ["otopark", "parking", "car park", "free parking", "park", "araç park"] )) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🚗",
+        title: isTurkish ? "Ücretsiz Otopark" : "Free Parking",
+        content: [
+          isTurkish ? "Evet, ücretsiz otoparkımız mevcuttur." : "Yes, we have free on-site parking available.",
+          isTurkish ? "Araçlarınızı güvenle park edebilir ve ziyarete başlayabilirsiniz." : "You can park your vehicle safely on site before entering the park.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["mangal", "braai", "barbeque", "bbq"] )) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🔥",
+        title: isTurkish ? "Mangal / Braai Seçenekleri" : "Braai / BBQ Options",
+        content: [
+          isTurkish ? "Evet, mangal yapma imkanı için piknik alanı seçeneklerimizi inceleyebilirsiniz." : "Yes, you can plan a braai setup through our picnic area options.",
+          isTurkish ? "Braai Area, Grass Area ve Ottoman Corner arasından uygun alan seçimi yapılabilir." : "You can choose from the Braai Area, Grass Area, or Ottoman Corner depending on the event size and setup.",
+        ],
+      }],
+      cta: { label: isTurkish ? "📅 Alan Seçimi" : "📅 Choose an Area", action: "reservation" },
+    };
+  }
+
+  if (containsAny(normalized, ["balik", "fishing", "fish", "angling", "tutma"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🎣",
+        title: isTurkish ? "Balık Tutma" : "Fishing",
+        content: [
+          isTurkish ? "Maalesef şu anda balık tutma hizmetimiz mevcut değildir." : "Unfortunately, fishing is not currently offered at Chamlija.",
+          isTurkish ? "Detaylı bilgi için lütfen alan ekibimizle iletişime geçin." : "For the most up-to-date information, please contact our team directly.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["at binisi", "horse riding", "ride horse", "horseback"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🐎",
+        title: isTurkish ? "At Binme" : "Horse Riding",
+        content: [
+          isTurkish ? "Maalesef şu anda at binme hizmetimiz mevcut değildir." : "At the moment, horse riding is not available at Chamlija.",
+          isTurkish ? "Sahip olduğumuz diğer açık hava aktivitelerini inceleyebilirsiniz." : "You can still explore the other outdoor activities available on site.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["yemek", "food", "restaurant", "dining", "eat", "coffee", "cay", "tea", "cold drink", "soguk icecek", "dondurma", "popcorn", "pancake", "pankek", "hamburger", "kara", "karinja", "delibite", "country bazaar"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🍽️",
+        title: isTurkish ? "İçeride Yemek & İçecek" : "Dining & Refreshments",
+        content: [
+          isTurkish ? "Evet, içerde çeşitli yiyecek ve içecek seçenekleri mevcut." : "Yes, there are food and refreshment options available on site.",
+          isTurkish ? "Karinja Türk restoranı, Delibite hamburger & hızlı servis, Country Bazaar marketi, çay, soğuk içecekler, Türk kahvesi, pankek, popcorn ve dondurma alanları bulunmaktadır." : "We have Karinja Turkish restaurant, Delibite for burgers and quick bites, Country Bazaar market, tea, cold drinks, Turkish coffee, pancakes, popcorn, and ice cream available on site.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["amphitheater", "amfitiyatro", "amphitheatre", "group", "80", "100", "100 kisilik", "90", "group of 80", "grouppicnic"])) {
+    const groupSize = /\d+/.exec(normalized)?.[0] ?? "80";
+    const suggestionText = isTurkish
+      ? `80-100 kişilik bir grup için ${groupSize} kişilik planla birlikte Amphitheater ve piknik alanı kombinasyonu uygun olabilir. Amphitheater giriş ücreti hariç ZAR 3,000 ve picnic alanı seçenekleri Braai Area / Ottoman Corner / Grass Area arasında değerlendirilebilir.`
+      : `For a group of 80–100 guests, a strong option is to combine the Amphitheater with a picnic area setup. The Amphitheater is ZAR 3,000 excluding entry fees, and the picnic area options can be reviewed between Braai Area, Ottoman Corner, and Grass Area.`;
+
+    return {
+      type: "pricing",
+      sections: [{
+        emoji: "🎯",
+        title: isTurkish ? "Önerilen Grup Planı" : "Suggested Group Setup",
+        content: [suggestionText],
+      }],
+      cta: { label: isTurkish ? "📅 Rezervasyon Yap" : "📅 Reserve Now", action: "reservation" },
+    };
+  }
+
+  if (containsAny(normalized, ["cocuk oyun alanı", "play park", "yellow wood", "playground", "oyun alanı"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🌳",
+        title: isTurkish ? "Çocuk Oyun Alanı" : "Play Park",
+        content: [
+          isTurkish ? "Evet, Yellow Wood Play Park ve çocuk dostu açık alanlarımız mevcut." : "Yes, we have the Yellow Wood Play Park and child-friendly outdoor spaces available.",
+          isTurkish ? "Bu alanlar aile ziyaretleri için uygun bir seçenek sunar." : "These are suitable for family visits and relaxed group outings.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["namaz", "prayer", "ibadet", "salah", "shalat", "namaz kilin", "prayer room", "prayer area", "namazsa"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🕌",
+        title: isTurkish ? "Namaz Kılma Yerleri" : "Prayer Facilities",
+        content: [
+          isTurkish ? "Evet, kadınlar ve erkekler için ayrı namaz kılma yerleri mevcuttur." : "Yes, we have separate prayer facilities for men and women available on site.",
+          isTurkish ? "Ziyaretçilerimiz rahat bir şekilde ibadetlerini gerçekleştirebilirler." : "Visitors can perform their prayers comfortably on our grounds.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["tuvalet", "toilet", "wc", "restroom", "bathroom", "tuvalet var", "bathroom facilities", "bathroom"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "🚻",
+        title: isTurkish ? "Tuvaletler" : "Toilet Facilities",
+        content: [
+          isTurkish ? "Evet, temiz ve düzenli tuvaletlerimiz mevcuttur." : "Yes, we have clean and well-maintained toilet facilities available.",
+          isTurkish ? "Erkek, kadın ve engelli ziyaretçiler için tuvaletlerimiz bulunmaktadır." : "We have toilets available for men, women, and visitors with disabilities.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["helal", "halal", "halaal", "kosher", "halal food", "halal yemek", "helal mi", "helal mı", "helal beslenme", "islamic food", "halal certifie", "helal belge"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "✅",
+        title: isTurkish ? "Helal Yemekler" : "HALAL Certified Food",
+        content: [
+          isTurkish ? "Evet, tüm yiyeceklerimiz 100% HELALdır." : "Yes, all our food options are 100% HALAL certified.",
+          isTurkish ? "Karinja Türk restoranı, Delibite'deki hamburger ve hızlı servis yemekleri dahil olmak üzere tüm gıdalar HELALdır. Country Bazaar'daki ürünler de helal kurallarına uygun seçilmiştir." : "This includes Karinja Turkish restaurant, Delibite's burgers and quick bites, and all items available at Country Bazaar are selected according to HALAL standards.",
+          isTurkish ? "Beslenme tercihleriniz hakkında endişe etmenize gerek yoktur." : "You can enjoy your meal with complete peace of mind regarding dietary requirements.",
+        ],
+      }],
+    };
+  }
+
+  if (containsAny(normalized, ["var mi", "var mı", "available", "do you have", "is there", "is there a", "bulunuyor mu", "mevcut mu"])) {
+    return {
+      type: "text",
+      sections: [{
+        emoji: "ℹ️",
+        title: isTurkish ? "Onaylı Bilgi" : "Verified Information",
+        content: [
+          isTurkish ? "Bu hizmetin sitede doğrulanmış bir versiyonu varsa size bildiririm; doğrulanmış olmayan seçenekler hakkında net bilgi vermemeye özen gösteririm." : "If this service is confirmed on our site, I can share it clearly; I avoid giving details about services that are not verified here.",
+          isTurkish ? "Daha net bilgi için lütfen alan ekibimizle iletişime geçin." : "For exact confirmation, please contact our team directly.",
+        ],
+      }],
+    };
+  }
+
+  return generateUnknownResponse();
+}
+
+export function generateAvailabilityResponse(input: string): ChatResponse {
+  const language = getLanguage(input);
+  const isTurkish = language === "tr";
+
+  // Dynamic import would be ideal, but for now we'll provide a calendar view link
+  const availabilityLink = "/book?view=availability";
+
+  const nextDays = isTurkish ? "gelecek 14 gün" : "next 14 days";
+  const calendarText = isTurkish
+    ? `Evet, takvim üzerinden uygun günleri kontrol edebilirsiniz. Dolu ve boş günler renklendirilerek gösterilir.`
+    : `Yes, you can check available dates on our calendar. Booked and available dates are clearly marked.`;
+
+  const howToCheckText = isTurkish
+    ? `Açılır takvim üzerinden ${nextDays} içindeki uygun günleri görebilir, direkt olarak rezervasyon yapabilirsiniz.`
+    : `Using the interactive calendar, you can see available dates within the ${nextDays} and book directly.`;
+
+  return {
+    type: "text",
+    sections: [
+      {
+        emoji: "📅",
+        title: isTurkish ? "Uygun Günler" : "Available Dates",
+        content: [
+          calendarText,
+          howToCheckText,
+          isTurkish 
+            ? "Kırmızı renkli günler dolu (rezerve edilmiş), yeşil günler uygun (boş)."
+            : "Red dates are booked, green dates are available for reservation.",
+        ],
+      },
+    ],
+    cta: {
+      label: isTurkish ? "📅 Takvimi Açarak Kontrol Et" : "📅 Check Calendar",
+      action: "reservation",
+      href: availabilityLink,
+    },
+  };
+}
+
 export function buildChamlijaAIResponse(input: string): ChatResponse {
   const intent = detectIntent(input);
   const counts = {
@@ -1150,6 +1370,10 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
       return generateOwnFurnitureResponse(input);
     case "group-quote":
       return generateGroupQuoteResponse(input);
+    case "facility-check":
+      return generateFacilityCheckResponse(input);
+    case "availability-check":
+      return generateAvailabilityResponse(input);
     default:
       return generateUnknownResponse();
   }

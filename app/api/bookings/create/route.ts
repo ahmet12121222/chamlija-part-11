@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { isValidBookingTime } from "@/lib/booking/hours";
 import { calculateBookingPriceBreakdown, parseSelectedEquipmentQuantities } from "@/lib/booking/pricing";
@@ -193,6 +194,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const reservationCode = `CHM-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${randomUUID().slice(0, 6).toUpperCase()}`;
+
     const payload = {
       customer_name: fullName,
       phone_number: phoneNumber,
@@ -210,6 +213,7 @@ export async function POST(request: Request) {
       entrance_fee_total: finalBreakdown.entranceFeeTotal,
       additional_total: finalBreakdown.additionalTotal,
       total_price: finalTotal,
+      reservation_code: reservationCode,
       booking_status: "pending",
       payment_status: "pending",
       notes: customerNotes,
@@ -218,14 +222,14 @@ export async function POST(request: Request) {
     const { data, error } = await supabaseAdmin
       .from("bookings")
       .insert([payload])
-      .select("id")
+      .select("id, reservation_code")
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ bookingId: data?.id ?? null, success: true }, { status: 201 });
+    return NextResponse.json({ bookingId: data?.id ?? null, reservationCode: data?.reservation_code ?? reservationCode, success: true }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       {

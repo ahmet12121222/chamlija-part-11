@@ -93,10 +93,10 @@ export async function POST(request: Request) {
       "result.externalTransactionID",
     ]);
 
-    const statusValue = getStringValue(payload, ["durum", "status", "data.durum", "result.durum"]);
-    const responseCode = getStringValue(payload, ["yanıt kodu", "yanitKodu", "responseCode", "code", "data.yanıt kodu", "result.yanıt kodu"]);
+    const statusValue = getStringValue(payload, ["status", "durum", "data.status", "data.durum", "result.status", "result.durum"]);
+    const responseCode = getStringValue(payload, ["responseCode", "code", "yanıt kodu", "yanitKodu", "data.responseCode", "result.responseCode"]);
     const amountValue = Number(
-      getStringValue(payload, ["miktar", "amount", "totalAmount", "value", "data.miktar", "data.amount", "result.miktar", "result.amount"]) ?? 0,
+      getStringValue(payload, ["amount", "totalAmount", "value", "miktar", "data.amount", "data.miktar", "result.amount", "result.miktar"]) ?? 0,
     );
 
     if (!paymentLinkId && !externalTransactionId) {
@@ -135,7 +135,8 @@ export async function POST(request: Request) {
     const amountsMatch = Number.isFinite(amountValue) && providerAmount > 0 ? amountValue === providerAmount : true;
 
     const isSuccessfulPayment =
-      normalizedStatus === "parali" ||
+      normalizedStatus === "success" ||
+      normalizedStatus === "paid" ||
       (normalizedStatus === "başari" && normalizeWebhookStatus(responseCode) === "00") ||
       (normalizedStatus === "basiari" && normalizeWebhookStatus(responseCode) === "00");
 

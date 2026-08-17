@@ -28,7 +28,7 @@ export default async function AdminDashboardPage({
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
     .from("bookings")
-    .select("id, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, selected_equipment_ids, notes")
+    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, selected_equipment_ids, notes")
     .order("booking_date", { ascending: true })
     .order("booking_time", { ascending: true })
     .limit(200);
@@ -97,7 +97,7 @@ export default async function AdminDashboardPage({
 
                 {items.map((booking) => (
                   <tr key={booking.id} className="align-top">
-                    <td className="px-4 py-3 font-medium text-slate-900">{booking.id}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{booking.reservation_code || booking.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{booking.customer_name || "Unknown"}</div>
                       <div className="text-xs text-slate-500">{booking.email || "No email"}</div>
@@ -146,8 +146,8 @@ export default async function AdminDashboardPage({
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking Reference</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{selectedBooking.id}</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Reservation Code</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{selectedBooking.reservation_code || selectedBooking.id}</div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total</div>

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { ProductRecord } from "@/lib/products/types";
 import { BOOKING_TIME_SLOTS } from "@/lib/booking/hours";
 import { calculateBookingPriceBreakdown, formatCurrency } from "@/lib/booking/pricing";
+import { AvailabilityCalendar } from "@/components/booking/availability-calendar";
 
 const initialForm = {
   fullName: "",
@@ -735,6 +736,11 @@ export default function BookingPage() {
           </section>
 
           <aside className="space-y-5">
+            <div className="rounded-lg border border-[#d8e6d9] bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold text-[#1e352d]">📅 Available Dates</h3>
+              <AvailabilityCalendar />
+            </div>
+
             <div className="rounded-[1.75rem] border border-forest/10 bg-white p-4 shadow-[0_18px_40px_rgba(20,37,29,0.05)] sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <p className="text-[10px] font-medium tracking-[0.22em] text-terracotta sm:text-xs">Reservation Summary</p>
