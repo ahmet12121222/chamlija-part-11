@@ -16,13 +16,15 @@ function PaymentContent() {
     error: string | null;
     booking: BookingPaymentSummary | null;
     selectedMethod: PaymentMethod | null;
-    submitting: boolean;
+    reservationConfirmed: boolean;
+    confirming: boolean;
   }>({
     loading: Boolean(bookingId),
     error: bookingId ? null : "No booking reference was supplied.",
     booking: null,
     selectedMethod: null,
-    submitting: false,
+    reservationConfirmed: false,
+    confirming: false,
   });
 
   // Load booking details on mount
@@ -72,13 +74,22 @@ function PaymentContent() {
     };
   }, [bookingId]);
 
-  const handleMethodSelect = async (method: PaymentMethod) => {
-    if (!state.booking) return;
-
+  const handleMethodSelect = (method: PaymentMethod) => {
+    // Just select the method locally, don't submit
     setState((prev) => ({
       ...prev,
       selectedMethod: method,
-      submitting: true,
+      error: null,
+    }));
+  };
+
+  const handleConfirmReservation = async () => {
+    if (!state.booking || !state.selectedMethod) return;
+
+    setState((prev) => ({
+      ...prev,
+      confirming: true,
+      error: null,
     }));
 
     try {
@@ -87,12 +98,12 @@ function PaymentContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId: state.booking.id,
-          paymentMethod: method,
+          paymentMethod: state.selectedMethod,
         }),
       });
 
       if (!response.ok) {
-        let errorMessage = "Failed to confirm payment method.";
+        let errorMessage = "Failed to confirm reservation.";
         try {
           const errorData = await response.json();
           if (errorData.error) {
@@ -106,14 +117,14 @@ function PaymentContent() {
 
       setState((prev) => ({
         ...prev,
-        submitting: false,
+        confirming: false,
+        reservationConfirmed: true,
       }));
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : "Failed to confirm payment method.",
-        submitting: false,
-        selectedMethod: null, // Reset selection on error
+        error: error instanceof Error ? error.message : "Failed to confirm reservation.",
+        confirming: false,
       }));
     }
   };
@@ -139,7 +150,7 @@ function PaymentContent() {
 
         <p className="text-sm font-semibold tracking-[0.18em] text-emerald-700">PAYMENT</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">
-          {state.loading ? "Loading your booking" : state.error ? "Error" : state.selectedMethod ? "Complete Your Booking" : "Choose Your Payment Method"}
+          {state.loading ? "Loading your booking" : state.error && !state.selectedMethod ? "Error" : state.selectedMethod && !state.reservationConfirmed ? "Confirm Your Booking" : "Complete Your Booking"}
         </h1>
 
         {/* Loading State */}
@@ -190,12 +201,62 @@ function PaymentContent() {
               </div>
             </div>
 
-            {/* Payment Method Selection */}
-            {!state.selectedMethod ? (
-              <PaymentMethodSelector onSelect={handleMethodSelect} loading={state.submitting} />
+            {/* Payment Method Selection or Confirmation */}
+            {!state.selectedMethod || state.error ? (
+              // Step 1: Select payment method
+              <>
+                {state.error && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 mb-4">
+                    <p className="font-semibold text-rose-900">{state.error}</p>
+                  </div>
+                )}
+                <PaymentMethodSelector onSelect={handleMethodSelect} loading={state.confirming} disabled={state.reservationConfirmed} />
+              </>
+            ) : !state.reservationConfirmed ? (
+              // Step 2: Review and confirm reservation
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="text-sm font-semibold text-emerald-900">Selected Payment Method</div>
+                  <div className="mt-2 text-lg font-semibold text-emerald-700">
+                    {state.selectedMethod === "bank_transfer" ? "Bank Transfer / EFT" : "Pay at the Gate – Cash"}
+                  </div>
+                  <p className="mt-2 text-sm text-emerald-800">
+                    {state.selectedMethod === "bank_transfer"
+                      ? "You will pay by making a secure bank transfer before your visit."
+                      : "You will pay in cash when you arrive at Chamlija."}
+                  </p>
+                </div>
+
+                {state.error && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                    <p className="font-semibold text-rose-900">{state.error}</p>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={handleConfirmReservation}
+                    disabled={state.confirming}
+                    className="w-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-3.5 text-center text-base font-semibold text-white shadow-[0_12px_26px_rgba(16,185,129,0.2)] transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {state.confirming ? "Confirming..." : "Confirm Reservation"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setState((prev) => ({ ...prev, selectedMethod: null, error: null }))}
+                    disabled={state.confirming}
+                    className="rounded-full border border-slate-300 bg-white px-6 py-3.5 text-center text-base font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Change Payment Method
+                  </button>
+                </div>
+              </div>
             ) : state.selectedMethod === "bank_transfer" ? (
+              // Step 3: Confirmed - Show bank transfer details
               <BankTransferDisplay booking={state.booking} />
             ) : (
+              // Step 3: Confirmed - Show cash at gate details
               <CashAtGateDisplay booking={state.booking} />
             )}
           </div>

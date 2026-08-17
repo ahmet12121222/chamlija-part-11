@@ -15,8 +15,8 @@ export function CashAtGateDisplay({ booking }: CashAtGateDisplayProps) {
       {/* Confirmation Card */}
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
         <div className="text-2xl font-black text-emerald-700">✓</div>
-        <div className="mt-3 text-lg font-semibold text-emerald-900">Payment Confirmed</div>
-        <p className="mt-2 text-sm text-emerald-800">Your booking has been confirmed. You can pay the full amount in cash when you arrive at Chamlija.</p>
+        <div className="mt-3 text-lg font-semibold text-emerald-900">Reservation Received</div>
+        <p className="mt-2 text-sm text-emerald-800">Your reservation has been received successfully. Payment will be made in cash when you arrive at Chamlija.</p>
       </div>
 
       {/* Booking Summary */}

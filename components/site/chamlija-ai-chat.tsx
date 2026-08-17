@@ -498,16 +498,29 @@ export function ChamlijaAIChat() {
               </div>
 
               {plannerOpen && (
-                <div className="mt-3 rounded-2xl border border-[#dfeae0] bg-white/90 p-3 shadow-[0_10px_24px_rgba(18,33,28,0.06)]">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#59715c]">PLAN MY DAY</div>
-                      <div className="text-sm font-semibold text-[#1d2a24]">{language === "tr" ? "Adım adım gün planı" : "Step-by-step day planner"}</div>
+                <div className="mt-3 flex max-h-[min(420px,calc(100dvh-480px))] flex-col rounded-2xl border border-[#dfeae0] bg-white/90 shadow-[0_10px_24px_rgba(18,33,28,0.06)]">
+                  <div className="shrink-0 border-b border-[#e4efe7] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#59715c]">PLAN MY DAY</div>
+                        <div className="text-sm font-semibold text-[#1d2a24]">{language === "tr" ? "Adım adım gün planı" : "Step-by-step day planner"}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={startPlanWizard} className="rounded-full border border-[#d8e5d8] bg-[#f3faf4] px-2 py-1 text-[10px] font-medium text-[#2d4638]">Reset</button>
+                        <button
+                          type="button"
+                          onClick={() => setPlannerOpen(false)}
+                          aria-label="Close planner"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d8e5d8] bg-[#f3faf4] text-sm font-medium text-[#2d4638] transition-colors hover:bg-[#e8f1e9]"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                    <button type="button" onClick={startPlanWizard} className="rounded-full border border-[#d8e5d8] bg-[#f3faf4] px-2 py-1 text-[10px] font-medium text-[#2d4638]">Reset</button>
                   </div>
 
-                  {currentPlannerStep === "group" && (
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                    {currentPlannerStep === "group" && (
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         {(["family", "couple", "friends", "solo"] as const).map((group) => (
@@ -706,41 +719,52 @@ export function ChamlijaAIChat() {
                     </div>
                   )}
 
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const currentIndex = plannerStepOrder.indexOf(plannerState.step);
-                        if (currentIndex > 0) {
-                          updatePlannerStep(plannerStepOrder[currentIndex - 1]);
-                        }
-                      }}
-                      className="rounded-full border border-[#d6e6d8] bg-white px-3 py-1.5 text-xs font-medium text-[#263d34]"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (plannerState.step === "summary") {
-                          // Summary adımında Create Plan basılırsa, rezervasyon sayfasına git
-                          router.push("/book");
-                          return;
-                        }
-                        const currentIndex = plannerStepOrder.indexOf(plannerState.step);
-                        if (currentIndex < plannerStepOrder.length - 1) {
-                          updatePlannerStep(plannerStepOrder[currentIndex + 1]);
-                          if (plannerState.step === "arrival") {
+                  </div>
+
+                  <div className="shrink-0 border-t border-[#e4efe7] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentIndex = plannerStepOrder.indexOf(plannerState.step);
+                          if (currentIndex > 0) {
+                            updatePlannerStep(plannerStepOrder[currentIndex - 1]);
+                          }
+                        }}
+                        className="rounded-full border border-[#d6e6d8] bg-white px-3 py-1.5 text-xs font-medium text-[#263d34] transition-colors hover:bg-[#f5faf6]"
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlannerOpen(false)}
+                        className="rounded-full border border-[#d6e6d8] bg-white px-3 py-1.5 text-xs font-medium text-[#263d34] transition-colors hover:bg-[#f5faf6]"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (plannerState.step === "summary") {
+                            // Summary adımında Create Plan basılırsa, rezervasyon sayfasına git
+                            router.push("/book");
+                            return;
+                          }
+                          const currentIndex = plannerStepOrder.indexOf(plannerState.step);
+                          if (currentIndex < plannerStepOrder.length - 1) {
+                            updatePlannerStep(plannerStepOrder[currentIndex + 1]);
+                            if (plannerState.step === "arrival") {
+                              finalizePlanner();
+                            }
+                          } else {
                             finalizePlanner();
                           }
-                        } else {
-                          finalizePlanner();
-                        }
-                      }}
-                      className="rounded-full bg-gradient-to-r from-[#dff4eb] to-[#e0ebff] px-3 py-1.5 text-xs font-semibold text-[#1a2d26]"
-                    >
-                      {currentPlannerStep === "summary" ? "Create Plan" : "Next"}
-                    </button>
+                        }}
+                        className="rounded-full bg-gradient-to-r from-[#dff4eb] to-[#e0ebff] px-3 py-1.5 text-xs font-semibold text-[#1a2d26] transition-transform hover:-translate-y-0.5"
+                      >
+                        {currentPlannerStep === "summary" ? "Create Plan" : "Next →"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
