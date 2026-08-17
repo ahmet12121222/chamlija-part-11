@@ -2,21 +2,45 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { LANGUAGES, getLanguageMeta, type LanguageCode } from "@/locales";
+import { useLanguage } from "@/components/site/language-provider";
 
-const NAV_LINKS = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Experiences", href: "#experiences" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Pricing", href: "#popular-options" },
-  { label: "Contact", href: "#contact" },
-];
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a10 10 0 0 1 0 20" />
+      <path d="M2 12h20" />
+      <path d="M12 2c-1.66 2.5-2 6-2 10s0.34 7.5 2 10" />
+      <path d="M12 2c1.66 2.5 2 6 2 10s-0.34 7.5-2 10" />
+    </svg>
+  );
+}
 
 export function SiteHeader() {
+  const { language, setLanguage, t } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const lastScrollY = useRef(0);
+
+  const NAV_LINKS = [
+    { label: t("nav.home", "Home"), href: "#home" },
+    { label: t("nav.about", "About"), href: "#about" },
+    { label: t("nav.experiences", "Experiences"), href: "#experiences" },
+    { label: t("nav.gallery", "Gallery"), href: "#gallery" },
+    { label: t("nav.pricing", "Pricing"), href: "#popular-options" },
+    { label: t("nav.contact", "Contact"), href: "#contact" },
+  ];
 
   useEffect(() => {
     lastScrollY.current = window.scrollY;
@@ -95,12 +119,46 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsLanguageOpen((open) => !open)}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                transparentMode ? "border-white/25 text-white hover:bg-white/10" : "border-[#14251d]/15 text-[#14251d] hover:bg-[#f6f2ea]"
+              }`}
+              aria-label="Language selector"
+            >
+              <GlobeIcon className="h-5 w-5" />
+            </button>
+
+            {isLanguageOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[140px] rounded-2xl border border-[#d8e2d8] bg-white p-1.5 shadow-[0_18px_32px_rgba(20,37,29,0.12)]">
+                {LANGUAGES.map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(item.code as LanguageCode);
+                      setIsLanguageOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                      language === item.code ? "bg-[#edf6ee] text-[#14251d] font-medium" : "text-[#3d4d45] hover:bg-[#f3f7f4]"
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {language === item.code && <span className="text-xs">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <Link
             href="/book"
             className="hidden items-center justify-center rounded-full bg-[#e8e1d4] px-6 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#14251d] shadow-[0_8px_18px_rgba(20,37,29,0.12)] transition hover:bg-white sm:inline-flex"
           >
-            Book Now
+            {t("nav.reservation", "Book Now")}
           </Link>
 
           <button
@@ -148,13 +206,39 @@ export function SiteHeader() {
             </a>
           ))}
         </nav>
-        <Link
-          href="/book"
-          onClick={() => setIsMenuOpen(false)}
-          className="mt-8 flex items-center justify-center rounded-full bg-terracotta px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-lg shadow-terracotta/30"
-        >
-          Book Now
-        </Link>
+        <div className="mt-8 space-y-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-2">
+            <div className="flex items-center justify-between gap-2 text-white/80">
+              <span className="text-[10px] uppercase tracking-[0.12em]">Language</span>
+              <span className="flex items-center gap-2 text-sm font-medium"><span>{getLanguageMeta(language).flag}</span>{getLanguageMeta(language).label}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {LANGUAGES.map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => {
+                    setLanguage(item.code as LanguageCode);
+                    setIsMenuOpen(false);
+                  }}
+                  className={`rounded-xl border px-2.5 py-2 text-left text-xs ${
+                    language === item.code ? "border-[#dff7e8] bg-white/10 text-white" : "border-white/10 bg-transparent text-white/70"
+                  }`}
+                >
+                  {item.flag} {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Link
+            href="/book"
+            onClick={() => setIsMenuOpen(false)}
+            className="flex items-center justify-center rounded-full bg-terracotta px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-lg shadow-terracotta/30"
+          >
+            {t("nav.reservation", "Book Now")}
+          </Link>
+        </div>
       </div>
     </header>
   );

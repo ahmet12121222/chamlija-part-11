@@ -1,8 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/components/site/language-provider";
 import { ABOUT_IMAGES } from "@/lib/media/chamlija-images";
 
 export function AboutSection() {
+  const { t } = useLanguage();
   const [first, second] = ABOUT_IMAGES;
 
   return (
@@ -19,21 +23,18 @@ export function AboutSection() {
         </div>
 
         <div className="lg:pl-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Chamlija’ya Hoş Geldiniz</p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">{t("about.eyebrow", "Welcome to Chamlija")}</p>
           <h2 className="mt-4 text-3xl font-semibold leading-[1.06] tracking-[-0.04em] text-[#14251d] sm:text-4xl lg:text-[2.7rem]">
-            Yavaşlamanın yeri
+            {t("about.heading", "A place to slow down")}
           </h2>
           <p className="mt-5 max-w-md text-base leading-7 text-[#49574f] sm:leading-8">
-            Buyuk Chamlija brings together shaded picnic corners, open lawns and event spaces
-            surrounded by nature. Whether you&apos;re planning a relaxed family picnic, a
-            celebration under a tent, or an active day out with friends, Chamlija offers a
-            peaceful setting with everything you need close at hand.
+            {t("about.body", "Buyuk Chamlija brings together shaded picnic corners, open lawns and event spaces surrounded by nature. Whether you're planning a relaxed family picnic, a celebration under a tent, or an active day out with friends, Chamlija offers a peaceful setting with everything you need close at hand.")}
           </p>
           <Link
             href="#experiences"
             className="mt-8 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.12em] text-[#14251d] transition hover:text-[#7a8462]"
           >
-            Araziyi Keşfet
+            {t("about.cta", "Explore the grounds")}
             <span aria-hidden="true">→</span>
           </Link>
         </div>

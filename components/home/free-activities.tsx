@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useLanguage } from "@/components/site/language-provider";
 import type { ProductRecord } from "@/lib/products/types";
 
 const FREE_ACTIVITIES: Array<{
@@ -46,6 +49,7 @@ const FREE_ACTIVITIES: Array<{
 ];
 
 export function FreeActivities({ products }: { products: ProductRecord[] }) {
+  const { t } = useLanguage();
   const freeActivities = products
     .filter((product) => product.category === "free_activity" && product.is_active)
     .sort((a, b) => (a.item_order ?? 0) - (b.item_order ?? 0) || a.name.localeCompare(b.name));
@@ -56,13 +60,13 @@ export function FreeActivities({ products }: { products: ProductRecord[] }) {
         <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">
-              INCLUDED WITH YOUR VISIT
+              {t("activities.eyebrow", "INCLUDED WITH YOUR VISIT")}
             </p>
             <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-              More to Discover at Chamlija
+              {t("activities.heading", "More to Discover at Chamlija")}
             </h2>
             <p className="mt-4 text-sm leading-7 text-[#49574f] sm:text-base">
-              Enjoy a range of outdoor experiences and family-friendly activities included with your visit.
+              {t("activities.body", "Enjoy a range of outdoor experiences and family-friendly activities included with your visit.")}
             </p>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -85,7 +89,7 @@ export function FreeActivities({ products }: { products: ProductRecord[] }) {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#102118]/80 via-[#102118]/20 to-transparent" />
                 <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">
                   <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-                    Included
+                    {t("common.included", "Included")}
                   </span>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
@@ -112,13 +116,13 @@ export function FreeActivities({ products }: { products: ProductRecord[] }) {
       <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">
-            INCLUDED WITH YOUR VISIT
+            {t("activities.eyebrow", "INCLUDED WITH YOUR VISIT")}
           </p>
           <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-            More to Discover at Chamlija
+            {t("activities.heading", "More to Discover at Chamlija")}
           </h2>
           <p className="mt-4 text-sm leading-7 text-[#49574f] sm:text-base">
-            Enjoy a range of outdoor experiences and family-friendly activities included with your visit.
+            {t("activities.body", "Enjoy a range of outdoor experiences and family-friendly activities included with your visit.")}
           </p>
         </div>
 
@@ -142,7 +146,7 @@ export function FreeActivities({ products }: { products: ProductRecord[] }) {
               <div className="absolute inset-0 bg-gradient-to-t from-[#102118]/80 via-[#102118]/20 to-transparent" />
               <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">
                 <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-                  Included
+                  {t("common.included", "Included")}
                 </span>
               </div>
               <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">

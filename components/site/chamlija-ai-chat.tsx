@@ -2,81 +2,40 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import {
-  extractConversationContextFromMessage,
-  getChamlijaKnowledgeReply,
-  type ChatConversationContext,
-} from "@/lib/chamlija/chamlija-knowledge";
-import { CHAMLIJA_AI_SYSTEM_PROMPT } from "@/lib/chamlija/chamlija-ai-system-prompt";
+import { useLanguage } from "@/components/site/language-provider";
+import { buildChamlijaAIResponse, type ChatResponse } from "@/lib/chamlija/chamlija-ai-improved";
 
 const GOOGLE_MAPS_URL = "https://maps.app.goo.gl/zf7qVqF4mqL8er928?g_st=ac";
 const BOOKING_ROUTE = "/book";
 
-type ChatAction = {
-  kind: "link" | "route";
-  href: string;
-  label: string;
-};
-
 type ChatMessage = {
   id: string;
   sender: "user" | "ai";
-  text: string;
-  action?: ChatAction;
-};
-
-const starterSuggestions = [
-  "Merhaba",
-  "💰 Fiyatlar",
-  "🌳 Aktiviteler",
-  "👨‍👩‍👧‍👦 Aile için öneri",
-  "📍 Konum",
-  "📅 Rezervasyon",
-];
-
-const buildKnowledgeReply = (
-  input: string,
-  context: ChatConversationContext,
-) => getChamlijaKnowledgeReply(input, context, CHAMLIJA_AI_SYSTEM_PROMPT);
-
-const normalizeMatchText = (value: string) =>
-  value.toLowerCase().trim().replace(/[^a-z0-9ğüşıöç\s]/gi, " ");
-
-const getSpecialAction = (value: string): ChatAction | undefined => {
-  const normalized = normalizeMatchText(value);
-
-  if (/(rezervasyon|reservation|book now|booking|reserve|rezervasyon yap|rezerve)/.test(normalized)) {
-    return { kind: "route", href: BOOKING_ROUTE, label: "📅 Rezervasyon Yap" };
-  }
-
-  if (/(konum|location|nerede|adres|harita|maps|google maps)/.test(normalized)) {
-    return { kind: "link", href: GOOGLE_MAPS_URL, label: "📍 Google Maps'te Konumu Aç" };
-  }
-
-  if (/(instagram|insta|social media)/.test(normalized)) {
-    return { kind: "link", href: "https://www.instagram.com/buyukchamlija/", label: "📸 Instagram" };
-  }
-
-  return undefined;
+  text?: string;
+  response?: ChatResponse;
+  action?: { kind: "link" | "route"; href: string; label: string };
 };
 
 export function ChamlijaAIChat() {
+  const { language, t } = useLanguage();
+
+  const starterSuggestions = [
+    language === "tr" ? "👋 Merhaba" : language === "af" ? "👋 Hallo" : language === "zu" ? "👋 Sawubona" : language === "xh" ? "👋 Molo" : "👋 Hello",
+    language === "tr" ? "💰 Fiyatlar" : language === "af" ? "💰 Pryse" : language === "zu" ? "💰 Amanani" : language === "xh" ? "💰 Ixabiso" : "💰 Prices",
+    language === "tr" ? "🌿 Aktiviteler" : language === "af" ? "🌿 Aktiwiteite" : language === "zu" ? "🌿 Imisebenzi" : language === "xh" ? "🌿 Imisebenzi" : "🌿 Activities",
+    language === "tr" ? "👨‍👩‍👧 Aile" : language === "af" ? "👨‍👩‍👧 Familie" : language === "zu" ? "👨‍👩‍👧 Umndeni" : language === "xh" ? "👨‍👩‍👧 Usapho" : "👨‍👩‍👧 Family",
+    language === "tr" ? "📍 Konum" : language === "af" ? "📍 Ligging" : language === "zu" ? "📍 Indawo" : language === "xh" ? "📍 Indawo" : "📍 Location",
+    language === "tr" ? "✨ Günümü Planla" : language === "af" ? "✨ Beplan My Dag" : language === "zu" ? "✨ Hlela Usuku Lwami" : language === "xh" ? "✨ Cwangcisa Usuku Lwam" : "✨ Plan My Day",
+  ];
+
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationContext, setConversationContext] = useState<ChatConversationContext>({
-    previousMessages: [],
-  });
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-1",
       sender: "ai",
-      text: "Merhaba 👋\nBen Chamlija AI destek asistanıyım. Chamlija hakkında merak ettiğiniz konularda size yardımcı olabilirim.",
-    },
-    {
-      id: "welcome-2",
-      sender: "ai",
-      text: "Size nasıl yardımcı olabilirim?",
+      text: t("ai.welcome", "👋 Welcome to Chamlija AI!\nI'm here to help you plan an amazing visit."),
     },
   ]);
 
@@ -93,37 +52,33 @@ export function ChamlijaAIChat() {
       return;
     }
 
-    const specialAction = getSpecialAction(trimmed);
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
       text: trimmed,
-      action: specialAction,
     };
 
-    const nextContext = extractConversationContextFromMessage(trimmed, conversationContext);
-    setConversationContext(nextContext);
     setMessages((current) => [...current, userMessage]);
     setInput("");
-
-    if (specialAction?.kind === "route") {
-      setIsTyping(false);
-      window.setTimeout(() => {
-        window.location.assign(specialAction.href);
-      }, 150);
-      return;
-    }
-
     setIsTyping(true);
 
     window.setTimeout(() => {
-      const replyText = buildKnowledgeReply(trimmed, nextContext);
+      const response = buildChamlijaAIResponse(trimmed);
       const reply: ChatMessage = {
         id: `ai-${Date.now() + 1}`,
         sender: "ai",
-        text: replyText,
-        action: specialAction?.kind === "link" ? specialAction : undefined,
+        response,
       };
+
+      if (response.cta) {
+        if (response.cta.action === "reservation") {
+          reply.action = { kind: "route", href: BOOKING_ROUTE, label: response.cta.label };
+        } else if (response.cta.action === "location") {
+          reply.action = { kind: "link", href: GOOGLE_MAPS_URL, label: response.cta.label };
+        } else if (response.cta.action === "instagram") {
+          reply.action = { kind: "link", href: "https://www.instagram.com/buyukchamlija/", label: response.cta.label };
+        }
+      }
 
       setMessages((current) => [...current, reply]);
       setIsTyping(false);
@@ -139,12 +94,8 @@ export function ChamlijaAIChat() {
     <>
       <style>{`
         @keyframes aiSupportFloat {
-          0%, 100% {
-            transform: translateY(0px) scale(1);
-          }
-          50% {
-            transform: translateY(-6px) scale(1.06);
-          }
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-6px) scale(1.06); }
         }
       `}</style>
 
@@ -161,6 +112,7 @@ export function ChamlijaAIChat() {
       {isOpen && (
         <div className="fixed bottom-5 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-[410px] overflow-hidden rounded-[28px] border border-[#d7e8df]/80 bg-white/75 shadow-[0_24px_60px_rgba(24,42,31,0.14)] backdrop-blur-xl sm:right-6">
           <div className="flex max-h-[min(700px,calc(100vh-40px))] min-h-[420px] flex-col overflow-hidden sm:h-[560px]">
+            {/* Header */}
             <div className="relative border-b border-[#e4efe7] bg-gradient-to-r from-[#f6fbff] via-[#f9f7f1] to-[#f7f9ee] px-4 py-3 sm:px-5">
               <div aria-hidden="true" className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-10 top-4 h-28 w-28 rounded-full bg-[#dfeefc]/70 blur-3xl" />
@@ -177,7 +129,7 @@ export function ChamlijaAIChat() {
                       <p className="truncate text-sm font-semibold text-[#14251d]">Chamlija AI</p>
                       <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#5fbf7e] shadow-[0_0_0_3px_rgba(95,191,126,0.18)]" />
                     </div>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#6b7d6a]">ÇEVRİMİÇİ</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#6b7d6a]">Online</p>
                   </div>
                 </div>
 
@@ -192,6 +144,7 @@ export function ChamlijaAIChat() {
               </div>
             </div>
 
+            {/* Messages Area */}
             <div className="flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_top_left,rgba(220,240,250,0.9),rgba(255,255,255,0.74)_28%,rgba(248,245,237,0.76)_100%)] px-3 pb-3 pt-4 sm:px-4">
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pr-1">
                 {messages.map((message) => (
@@ -207,20 +160,89 @@ export function ChamlijaAIChat() {
                         </div>
                       )}
 
-                      <div
-                        className={`break-words rounded-2xl border px-3.5 py-2.5 text-sm leading-6 shadow-[0_8px_20px_rgba(20,37,29,0.06)] ${
-                          message.sender === "user"
-                            ? "border-[#dfeef6] bg-gradient-to-br from-[#dff3ff] to-[#edf8ea] text-[#1b2d25]"
-                            : "border-[#eef0eb] bg-white/80 text-[#1e2a21]"
-                        }`}
-                        style={{
-                          whiteSpace: "normal",
-                          overflowWrap: "anywhere",
-                          wordBreak: "break-word",
-                          minWidth: 0,
-                        }}
-                      >
-                        {message.text}
+                      <div className={`break-words rounded-2xl border px-3.5 py-2.5 text-sm leading-6 shadow-[0_8px_20px_rgba(20,37,29,0.06)] ${
+                        message.sender === "user"
+                          ? "border-[#dfeef6] bg-gradient-to-br from-[#dff3ff] to-[#edf8ea] text-[#1b2d25]"
+                          : "border-[#eef0eb] bg-white/80 text-[#1e2a21]"
+                      }`} style={{ whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word", minWidth: 0 }}>
+                        {message.text && (
+                          <div className="whitespace-pre-wrap">{message.text}</div>
+                        )}
+                        
+                        {message.response && (
+                          <div className="space-y-3">
+                            {message.response.type === "itinerary" && message.response.timeline && (
+                              <div className="space-y-3">
+                                {message.response.timeline.map((slot, idx) => (
+                                  <div key={`${slot.time}-${idx}`} className="rounded-2xl border border-[#e7efe8] bg-[#f9fbf8] p-3 shadow-sm">
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5a705f]">
+                                        {slot.time}
+                                      </span>
+                                      {slot.badge && (
+                                        <span className="rounded-full border border-[#dde9df] bg-white px-2 py-0.5 text-[10px] font-medium text-[#365247]">
+                                          {slot.badge}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="text-sm font-semibold text-[#172822]">{slot.title}</div>
+                                    <div className="mt-1 text-xs leading-5 text-[#42574a]">{slot.description}</div>
+
+                                    {slot.price && (
+                                      <div className="mt-2 text-[11px] font-medium text-[#1d2a24]">{slot.price}</div>
+                                    )}
+
+                                    {slot.note && (
+                                      <div className="mt-1 text-[11px] leading-4 text-[#4d665b]">{slot.note}</div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {message.response.sections.map((section, idx) => (
+                              <div key={idx} className="space-y-1">
+                                {section.emoji && section.title && (
+                                  <div className="font-semibold text-[#14251d]">
+                                    {section.emoji} {section.title}
+                                  </div>
+                                )}
+
+                                {Array.isArray(section.content) ? (
+                                  <div className="space-y-1.5 pl-3">
+                                    {section.content.map((item, i) => {
+                                      if (typeof item === "string") {
+                                        return (
+                                          <div key={i} className="text-sm leading-5">
+                                            {item}
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div key={i} className="flex justify-between gap-2 text-sm">
+                                            <span className="font-medium">{item.label}</span>
+                                            <span className="font-normal opacity-85">{item.value}</span>
+                                          </div>
+                                        );
+                                      }
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm leading-5 pl-3 opacity-90">
+                                    {section.content}
+                                  </div>
+                                )}
+
+                                {section.subtitle && (
+                                  <div className="text-xs leading-4 pl-3 opacity-75 pt-1">
+                                    {section.subtitle}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {message.action && (
@@ -267,13 +289,14 @@ export function ChamlijaAIChat() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Input Area */}
               <div className="mt-3 shrink-0 rounded-2xl border border-[#e2ebdf] bg-white/80 p-2 shadow-[0_10px_24px_rgba(18,33,28,0.05)]">
                 <div className="mb-2 flex flex-wrap gap-2">
                   {starterSuggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
-                      onClick={() => sendMessage(suggestion.replace(/^[^\w\sçğıöşüÇĞİÖŞÜ]+/u, ""))}
+                      onClick={() => sendMessage(suggestion.replace(/^[^\w\s]+/u, ""))}
                       className="rounded-full border border-[#d7e7d8] bg-gradient-to-r from-white to-[#f5faf4] px-2.5 py-1.5 text-[11px] font-medium text-[#2b3f36] transition-transform hover:-translate-y-0.5 hover:border-[#bfd6c4]"
                     >
                       {suggestion}
@@ -286,14 +309,14 @@ export function ChamlijaAIChat() {
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
                     type="text"
-                    placeholder="Chamlija hakkında bir şey sorun..."
+                    placeholder="Ask about Chamlija..."
                     className="h-12 flex-1 rounded-full border border-[#dfe7e2] bg-[#f7faf7] px-4 text-sm text-[#1d2a24] outline-none transition focus:border-[#bfd1c8] focus:bg-white"
-                    aria-label="Mesaj yaz"
+                    aria-label="Message"
                   />
 
                   <button
                     type="submit"
-                    aria-label="Gönder"
+                    aria-label="Send"
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#dff4eb] via-[#dfeefb] to-[#f4f2cf] text-lg shadow-[0_12px_26px_rgba(95,136,106,0.18)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02]"
                   >
                     ➤

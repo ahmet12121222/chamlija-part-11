@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/components/site/language-provider";
 import type { ProductRecord } from "@/lib/products/types";
 import { getProductImage } from "@/lib/media/chamlija-images";
 
@@ -12,6 +15,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function PopularOptions({ products }: { products: ProductRecord[] }) {
+  const { t } = useLanguage();
   const options = products
     .filter((product) => product.is_active && product.is_bookable && !product.is_free && product.category !== "free_activity")
     .sort((a, b) => (a.item_order ?? 0) - (b.item_order ?? 0) || a.name.localeCompare(b.name))
@@ -20,14 +24,14 @@ export function PopularOptions({ products }: { products: ProductRecord[] }) {
   return (
     <section id="popular-options" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
       <div className="max-w-xl">
-        <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">Popular Options</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">{t("pricing.eyebrow", "Popular Options")}</p>
         <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
-          Guest favourites
+          {t("pricing.heading", "Guest favourites")}
         </h2>
       </div>
 
       {options.length === 0 ? (
-        <p className="mt-10 text-[#49574f]">Pricing will appear here once the catalog is ready.</p>
+        <p className="mt-10 text-[#49574f]">{t("pricing.empty", "Pricing will appear here once the catalog is ready.")}</p>
       ) : (
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {options.map((product) => {
@@ -63,7 +67,7 @@ export function PopularOptions({ products }: { products: ProductRecord[] }) {
                       href="/book"
                       className="inline-flex items-center justify-center rounded-full bg-[#14251d] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[#1b3129]"
                     >
-                      Book Now
+                      {t("common.bookNow", "Book Now")}
                     </Link>
                   </div>
                 </div>
