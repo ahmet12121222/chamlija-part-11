@@ -216,6 +216,23 @@ export default async function AdminDashboardPage({
               </div>
             )}
 
+            {selectedBooking.payment_status === "pending" && selectedBooking.payment_method === "bank_transfer" && (
+              <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-sm font-semibold text-emerald-900">Confirm Payment</div>
+                <p className="mt-2 text-sm text-emerald-800">The payment is pending. Confirm it to mark the booking as paid and confirmed.</p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <form action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      ✓ Confirm Payment
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
             {selectedBooking.payment_method === "bank_transfer" && (
               <div className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="text-sm font-semibold text-sky-900">Bank transfer review</div>
