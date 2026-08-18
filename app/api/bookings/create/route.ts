@@ -5,6 +5,8 @@ import { calculateBookingPriceBreakdown, parseSelectedEquipmentQuantities } from
 import { validateAreaCapacity, getAreaCapacity } from "@/lib/business-rules/areas";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+const AREA_SLOT_CONFLICT_MESSAGE = "This area is already booked for this date and time. Please choose another area or time.";
+
 function parseNonNegativeInteger(value: unknown): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : 0;
@@ -180,14 +182,15 @@ export async function POST(request: Request) {
         .eq("selected_area_id", areaId)
         .eq("booking_date", bookingDate)
         .eq("booking_time", bookingTime)
-        .in("booking_status", ["pending", "confirmed"]);
+        .in("booking_status", ["pending", "confirmed"])
+        .or("payment_status.is.null,payment_status.not.in.(rejected,cancelled,failed,refunded,refund_failed)");
 
       if (conflictError) {
         return NextResponse.json({ error: conflictError.message }, { status: 500 });
       }
 
       if ((conflictingBookings ?? []).length > 0) {
-        return NextResponse.json({ error: "Unfortunately, this time slot is unavailable." }, { status: 409 });
+        return NextResponse.json({ error: AREA_SLOT_CONFLICT_MESSAGE }, { status: 409 });
       }
     }
 
@@ -249,6 +252,10 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json({ error: AREA_SLOT_CONFLICT_MESSAGE }, { status: 409 });
+      }
+
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

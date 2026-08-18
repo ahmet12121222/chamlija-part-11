@@ -293,7 +293,7 @@ export default function BookingPage() {
 
     setAvailabilityState({
       checking: false,
-      message: "Unfortunately, this time slot is unavailable.",
+      message: "This area is already booked for the selected date and time. Please choose another area or time.",
       isAvailable: false,
       availableSlots: slots,
       suggestedDates: suggestions,
@@ -335,7 +335,7 @@ export default function BookingPage() {
 
     setAvailabilityState({
       checking: false,
-      message: slots.length > 0 ? "This picnic area is available. Please select a time." : "Unfortunately, this date is unavailable.",
+      message: slots.length > 0 ? "This picnic area is available. Please select a time." : "This area is already booked for the selected date and time. Please choose another area or time.",
       isAvailable: slots.length > 0 ? null : false,
       availableSlots: slots,
       suggestedDates: suggestions,

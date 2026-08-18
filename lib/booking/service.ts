@@ -120,7 +120,8 @@ export async function getExistingBookingsForArea(dateValue: string, areaId: stri
       .select("id, selected_area_id, booking_date, booking_time, booking_status, payment_status")
       .eq("selected_area_id", areaId)
       .eq("booking_date", dateValue)
-      .in("booking_status", ["pending", "confirmed"]);
+      .in("booking_status", ["pending", "confirmed"])
+      .or("payment_status.is.null,payment_status.not.in.(rejected,cancelled,failed,refunded,refund_failed)");
 
     if (error || !data) {
       return [];

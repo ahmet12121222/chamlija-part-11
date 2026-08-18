@@ -71,7 +71,7 @@ export function ChamlijaAreaMap() {
   const visibleAreas = activeCategory === "All" ? areaItems : areaItems.filter((area) => area.category === activeCategory);
 
   return (
-    <section className="border-y border-forest/10 bg-[#eef1e5] px-4 py-16 sm:px-6 lg:px-8 lg:py-24" aria-labelledby="chamlija-area-map-title">
+    <section className="hidden border-y border-forest/10 bg-[#eef1e5] px-4 py-16 sm:px-6 md:block lg:px-8 lg:py-24" aria-labelledby="chamlija-area-map-title">
       <div className="mx-auto max-w-7xl">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-terracotta">Explore Chamlija</p>
@@ -122,7 +122,7 @@ export function ChamlijaAreaMap() {
 
           <aside className="rounded-[2rem] border border-forest/10 bg-white p-6 shadow-[0_18px_45px_rgba(25,53,42,0.06)]" aria-live="polite">
             <div className="flex items-center justify-between gap-3">
-              <span className="rounded-full bg-forest/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-forest">Selected area</span>
+              <span className="rounded-full bg-forest/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-forest">Area details</span>
               <span className={`rounded-full px-3 py-1 text-xs font-bold ${selectedArea.available === "Free" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{selectedArea.available}</span>
             </div>
             <h3 className="mt-6 text-2xl font-black text-forest">{selectedArea.name}</h3>
