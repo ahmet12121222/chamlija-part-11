@@ -15,31 +15,85 @@ function normalizePaymentMethod(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase().replace(/[-\s]+/g, "_");
 }
 
-function isPendingBankTransferBooking(booking: { payment_status?: string | null; payment_method?: string | null }) {
-  if (booking.payment_status !== "pending") {
+function formatPaymentMethod(value: string | null | undefined) {
+  const normalized = normalizePaymentMethod(value);
+  if (!normalized) {
+    return "Not selected";
+  }
+
+  if (normalized.includes("ikhokha") || normalized.includes("ikhokha")) {
+    return "iKhokha";
+  }
+
+  if (
+    normalized === "bank_transfer" ||
+    normalized === "banktransfer" ||
+    normalized === "manual" ||
+    normalized === "manual_payment" ||
+    normalized === "manual_bank_transfer" ||
+    normalized === "manual_bank_payment" ||
+    normalized === "bank_transfer_manual" ||
+    normalized === "bank_transfer_manual_payment" ||
+    normalized === "bank_transfer_payment"
+  ) {
+    return "Bank Transfer";
+  }
+
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function formatBookingStatus(status: string | null | undefined) {
+  const normalized = String(status ?? "pending").trim().toLowerCase();
+  if (normalized === "confirmed" || normalized === "paid") return "Confirmed";
+  if (normalized === "cancelled" || normalized === "canceled") return "Cancelled";
+  return "Pending";
+}
+
+function formatPaymentStatus(status: string | null | undefined) {
+  const normalized = String(status ?? "pending").trim().toLowerCase();
+  if (normalized === "paid" || normalized === "verified" || normalized === "approved") return "Paid";
+  if (normalized === "failed" || normalized === "rejected") return "Failed";
+  return "Pending";
+}
+
+function isBankTransferMethod(value: string | null | undefined) {
+  const normalized = normalizePaymentMethod(value);
+  if (!normalized) {
     return false;
   }
 
-  const method = normalizePaymentMethod(booking.payment_method);
-  const allowedMethods = new Set([
-    "bank_transfer",
-    "banktransfer",
-    "manual",
-    "manual_payment",
-    "manual_bank_transfer",
-    "manual_bank_payment",
-    "bank_transfer_manual",
-    "bank_transfer_manual_payment",
-    "bank_transfer_payment",
-  ]);
+  return (
+    normalized === "bank_transfer" ||
+    normalized === "banktransfer" ||
+    normalized === "manual" ||
+    normalized === "manual_payment" ||
+    normalized === "manual_bank_transfer" ||
+    normalized === "manual_bank_payment" ||
+    normalized === "bank_transfer_manual" ||
+    normalized === "bank_transfer_manual_payment" ||
+    normalized === "bank_transfer_payment" ||
+    normalized.includes("bank") ||
+    (normalized.includes("manual") && normalized.includes("bank"))
+  );
+}
 
-  return allowedMethods.has(method);
+function isPendingBankTransferBooking(booking: { payment_status?: string | null; payment_method?: string | null }) {
+  if (String(booking.payment_status ?? "").trim().toLowerCase() !== "pending") {
+    return false;
+  }
+
+  return isBankTransferMethod(booking.payment_method);
+}
+
+function isIhkokhaMethod(value: string | null | undefined) {
+  const normalized = normalizePaymentMethod(value);
+  return normalized.includes("ikhokha") || normalized.includes("ikhokha");
 }
 
 export default async function AdminDashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ bookingId?: string }>;
+  searchParams?: Promise<{ bookingId?: string; filter?: string }>;
 }) {
   try {
     await requireAdminAccess();
@@ -49,6 +103,7 @@ export default async function AdminDashboardPage({
 
   const params = searchParams ? await searchParams : {};
   const selectedBookingId = typeof params.bookingId === "string" ? params.bookingId : null;
+  const activeFilter = typeof params.filter === "string" ? params.filter : "all";
 
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
@@ -71,6 +126,14 @@ export default async function AdminDashboardPage({
   }
 
   const items = bookings ?? [];
+  const filteredItems = items.filter((booking) => {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "bank_transfer") return isBankTransferMethod(booking.payment_method) && !isIhkokhaMethod(booking.payment_method);
+    if (activeFilter === "ikhokha") return isIhkokhaMethod(booking.payment_method);
+    if (activeFilter === "pending_payment") return String(booking.payment_status ?? "").trim().toLowerCase() === "pending";
+    if (activeFilter === "paid") return ["paid", "verified", "confirmed", "approved"].includes(String(booking.payment_status ?? "").trim().toLowerCase());
+    return true;
+  });
   const selectedBooking = items.find((booking) => booking.id === selectedBookingId) ?? null;
   const pendingBankTransferBooking = selectedBooking ? isPendingBankTransferBooking(selectedBooking) : false;
   const selectedPayment = selectedBooking
@@ -96,6 +159,31 @@ export default async function AdminDashboardPage({
           </div>
         </div>
 
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+            { value: "all", label: "All" },
+            { value: "bank_transfer", label: "Bank Transfer" },
+            { value: "ikhokha", label: "iKhokha" },
+            { value: "pending_payment", label: "Pending Payment" },
+            { value: "paid", label: "Paid" },
+          ].map((filterOption) => {
+            const isActive = activeFilter === filterOption.value;
+            return (
+              <a
+                key={filterOption.value}
+                href={selectedBookingId ? `/admin?bookingId=${encodeURIComponent(selectedBookingId)}&filter=${encodeURIComponent(filterOption.value)}` : `/admin?filter=${encodeURIComponent(filterOption.value)}`}
+                className={`inline-flex items-center rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  isActive
+                    ? "bg-emerald-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {filterOption.label}
+              </a>
+            );
+          })}
+        </div>
+
         <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
@@ -107,20 +195,21 @@ export default async function AdminDashboardPage({
                   <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Area</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Total</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Payment Method</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {items.length === 0 && (
+                {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                       No bookings found.
                     </td>
                   </tr>
                 )}
 
-                {items.map((booking) => (
+                {filteredItems.map((booking) => (
                   <tr key={booking.id} className="align-top">
                     <td className="px-4 py-3 font-medium text-slate-900">{booking.reservation_code || booking.id}</td>
                     <td className="px-4 py-3">
@@ -131,15 +220,17 @@ export default async function AdminDashboardPage({
                     <td className="px-4 py-3">{booking.booking_time || "—"}</td>
                     <td className="px-4 py-3">{booking.selected_area_id || "—"}</td>
                     <td className="px-4 py-3">{formatMoney(booking.total_price)}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatPaymentMethod(booking.payment_method)}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                        {formatStatus(booking.booking_status)}
-                      </span>
-                      <div className="mt-2 text-xs text-slate-500">Payment: {formatStatus(booking.payment_status)}</div>
+                      <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        Booking: {formatBookingStatus(booking.booking_status)}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-500">Payment: {formatPaymentStatus(booking.payment_status)}</div>
                     </td>
                     <td className="px-4 py-3">
                       <form action="/admin" method="GET">
                         <input type="hidden" name="bookingId" value={booking.id} />
+                        <input type="hidden" name="filter" value={activeFilter} />
                         <button
                           type="submit"
                           className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
@@ -192,36 +283,37 @@ export default async function AdminDashboardPage({
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking Status</div>
-                <div data-booking-status-display className="mt-2 text-sm font-semibold text-slate-900">{formatStatus(selectedBooking.booking_status)}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact</div>
-                <div className="mt-2 text-sm text-slate-900">{selectedBooking.email || "No email"}</div>
-                <div className="text-sm text-slate-700">{selectedBooking.phone_number || "No phone number"}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Notes</div>
-                <div className="mt-2 text-sm text-slate-900">{selectedBooking.notes || "No extra notes."}</div>
+                <div data-booking-status-display className="mt-2 text-sm font-semibold text-slate-900">{formatBookingStatus(selectedBooking.booking_status)}</div>
               </div>
             </div>
 
-            {/* Payment Status Section */}
+            {/* Payment Information Section */}
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-700">Payment Status</div>
+              <div className="text-sm font-semibold text-slate-700">Payment Information</div>
               <div className="mt-3 space-y-2">
                 <div>
-                  <span className="text-xs text-slate-600">Method:</span>
-                  <span className="ml-2 font-medium text-slate-900">{selectedBooking.payment_method ? formatStatus(selectedBooking.payment_method) : "Not selected"}</span>
+                  <span className="text-xs text-slate-600">Payment Method:</span>
+                  <span className="ml-2 font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span>
                 </div>
                 <div>
-                  <span className="text-xs text-slate-600">Status:</span>
-                  <span data-payment-status-display className="ml-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatStatus(selectedBooking.payment_status)}</span>
+                  <span className="text-xs text-slate-600">Payment Status:</span>
+                  <span data-payment-status-display className="ml-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatPaymentStatus(selectedBooking.payment_status)}</span>
                 </div>
                 <div>
                   <span className="text-xs text-slate-600">Amount:</span>
                   <span className="ml-2 font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact</div>
+              <div className="mt-2 text-sm text-slate-900">{selectedBooking.email || "No email"}</div>
+              <div className="text-sm text-slate-700">{selectedBooking.phone_number || "No phone number"}</div>
+            </div>
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Notes</div>
+              <div className="mt-2 text-sm text-slate-900">{selectedBooking.notes || "No extra notes."}</div>
             </div>
 
             {/* Manual Payment Confirmation */}
@@ -469,7 +561,14 @@ export default async function AdminDashboardPage({
 
                         const result = await response.json().catch(() => ({}));
                         if (!response.ok) {
-                          alert(result?.error || 'Unable to confirm payment.');
+                          const errorMessage = result?.error || 'Payment confirmation failed.';
+                          const paymentNotice = document.getElementById('payment-confirmation-message');
+                          if (paymentNotice) {
+                            paymentNotice.textContent = 'Payment confirmation failed: ' + errorMessage;
+                            paymentNotice.hidden = false;
+                          } else {
+                            alert('Payment confirmation failed: ' + errorMessage);
+                          }
                           return;
                         }
 
@@ -486,9 +585,23 @@ export default async function AdminDashboardPage({
                         if (paymentPanel) {
                           paymentPanel.remove();
                         }
+
+                        const message = document.getElementById('payment-confirmation-message');
+                        if (message) {
+                          message.textContent = 'Payment confirmed successfully';
+                          message.hidden = false;
+                        }
+
+                        window.location.reload();
                       } catch (error) {
                         console.error('Confirm payment failed:', error);
-                        alert('Unable to confirm payment.');
+                        const paymentNotice = document.getElementById('payment-confirmation-message');
+                        if (paymentNotice) {
+                          paymentNotice.textContent = 'Payment confirmation failed: ' + (error instanceof Error ? error.message : 'Unknown error');
+                          paymentNotice.hidden = false;
+                        } else {
+                          alert('Payment confirmation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                        }
                       }
                     });
                   });
