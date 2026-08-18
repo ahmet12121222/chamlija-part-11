@@ -102,8 +102,6 @@ export async function POST(request: Request) {
     }
 
     const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
 
     try {
       const response = await fetch(geminiUrl, {
@@ -112,7 +110,6 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey,
         },
-        signal: controller.signal,
         body: JSON.stringify({
           systemInstruction: {
             parts: [{ text: buildGeminiSystemPrompt() }],
@@ -125,8 +122,6 @@ export async function POST(request: Request) {
           contents: getGeminiContents(message, rawMessages),
         }),
       });
-
-      clearTimeout(timeout);
 
       const payload = await response.json().catch(() => ({}));
 
@@ -160,7 +155,6 @@ export async function POST(request: Request) {
         source: "gemini",
       });
     } catch (error) {
-      clearTimeout(timeout);
       const fallbackResponse = buildChamlijaAIResponse(message);
       return NextResponse.json({
         text: formatFallbackResponse(fallbackResponse),
