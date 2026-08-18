@@ -848,6 +848,21 @@ export default function BookingPage() {
                       <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.singleItemTotal)}</span>
                     </div>
                   )}
+
+                  <div className="border-t border-forest/15 pt-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span className="font-semibold text-forest-dark">{formatCurrency(bookingPriceBreakdown.subtotal)}</span>
+                    </div>
+                  </div>
+
+                  {bookingPriceBreakdown.discountAmount > 0 && bookingPriceBreakdown.discountPercentage > 0 && (
+                    <div className="flex items-center justify-between text-sm text-emerald-700">
+                      <span>Early Booking Discount ({bookingPriceBreakdown.discountPercentage}%)</span>
+                      <span className="font-semibold">-{formatCurrency(bookingPriceBreakdown.discountAmount)}</span>
+                    </div>
+                  )}
+
                   <div className="border-t border-forest/15 pt-3">
                     <div className="flex items-center justify-between text-base font-bold text-forest-dark sm:text-lg">
                       <span>Total</span>
