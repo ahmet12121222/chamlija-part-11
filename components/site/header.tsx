@@ -83,7 +83,7 @@ export function SiteHeader() {
   }, [isMenuOpen]);
 
   useEffect(() => {
-    if (isLanguageOpen) {
+    if (isLanguageOpen && typeof window !== "undefined" && window.innerWidth >= 1024) {
       setIsMenuOpen(false);
     }
   }, [isLanguageOpen]);
@@ -371,10 +371,10 @@ export function SiteHeader() {
                 </div>
               </div>
 
-              <div>
+              <div className="lg:hidden">
                 <button
                   type="button"
-                  onClick={() => setIsLanguageOpen(true)}
+                  onClick={() => setIsLanguageOpen((open) => !open)}
                   className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm text-white/90"
                 >
                   <span className="font-medium text-[#d7d9c6]">Language</span>
@@ -386,13 +386,65 @@ export function SiteHeader() {
                     </svg>
                   </span>
                 </button>
+
+                {isLanguageOpen && (
+                  <div
+                    ref={languagePanelRef}
+                    className="mt-3 overflow-hidden rounded-[1.5rem] border border-[#dfe8df] bg-[#f8f6f1] shadow-[0_20px_40px_rgba(20,37,29,0.12)]"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between border-b border-[#dfe8df] px-4 py-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a8462]">Language</p>
+                        <p className="mt-1 text-sm font-semibold text-[#14251d]">Choose your language</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#dfe8df] bg-white text-[#14251d] transition hover:bg-[#edf6ee]"
+                        onClick={() => setIsLanguageOpen(false)}
+                        aria-label="Close language selector"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto p-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {LANGUAGES.map((item) => (
+                          <button
+                            key={item.code}
+                            type="button"
+                            onClick={() => {
+                              setLanguage(item.code as LanguageCode);
+                              setIsLanguageOpen(false);
+                              setIsMenuOpen(false);
+                            }}
+                            className={`flex items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition active:scale-[0.99] ${
+                              language === item.code
+                                ? "border-[#cfe8d6] bg-[#edf6ee] text-[#14251d] shadow-sm"
+                                : "border-[#e4e7df] bg-white text-[#3d4d45] hover:bg-[#f3f7f4]"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="text-base">{item.flag}</span>
+                              <span className="font-medium">{item.label}</span>
+                            </span>
+                            {language === item.code && <span className="text-xs font-bold text-[#19352a]">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {isLanguageOpen && (
+      {isLanguageOpen && !isMenuOpen && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#14251d]/45 p-3 backdrop-blur-[2px] sm:items-center" onClick={() => setIsLanguageOpen(false)}>
           <div
             ref={languagePanelRef}
