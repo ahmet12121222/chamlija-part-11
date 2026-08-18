@@ -470,13 +470,17 @@ export function ChamlijaAIChat() {
                               {message.action.label}
                             </a>
                           ) : (
-                            <Link
-                              href={message.action.href}
-                              onClick={() => setIsOpen(false)}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!message.action) return;
+                                setIsOpen(false);
+                                router.push(message.action.href);
+                              }}
                               className="inline-flex items-center justify-center rounded-full border border-[#d8ead9] bg-gradient-to-r from-[#edf8f2] to-[#eaf4ff] px-3 py-2 text-xs font-medium text-[#1d2a24] shadow-sm transition hover:-translate-y-0.5"
                             >
                               {message.action.label}
-                            </Link>
+                            </button>
                           )}
                         </div>
                       )}
