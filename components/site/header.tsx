@@ -302,7 +302,7 @@ export function SiteHeader() {
 
         <div
           ref={menuPanelRef}
-          className={`absolute inset-y-0 right-0 z-[71] flex h-[100dvh] w-[86vw] max-w-[20rem] flex-col overflow-hidden bg-[#132a23] shadow-[0_25px_60px_rgba(20,37,29,0.28)] transition-all duration-300 ${
+          className={`fixed inset-0 z-[71] flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-y-auto bg-[#132a23] shadow-[0_25px_60px_rgba(20,37,29,0.28)] transition-all duration-300 ${
             isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
           }`}
         >
@@ -325,8 +325,8 @@ export function SiteHeader() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5">
-            <div className="space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
+            <div className="space-y-5 pb-8">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d7d9c6]">Navigation</p>
                 <nav className="mt-3 flex flex-col gap-1">
