@@ -70,15 +70,14 @@ export async function POST(request: Request) {
       if (!geminiResponse.ok) {
         const status = geminiResponse.status;
         const googleError = payload?.error ?? payload ?? {};
+        const googleMessage = typeof googleError?.message === "string" ? googleError.message : "Gemini request failed";
+        const googleStatus = googleError?.status ?? "unknown";
+        const googleCode = googleError?.code ?? "unknown";
 
         return NextResponse.json({
-          text: "GEMINI_ERROR",
+          text: `Gemini HTTP ${status}: ${googleMessage} | status: ${googleStatus} | code: ${googleCode}`,
           fallback: true,
           source: "gemini-error",
-          debug: {
-            status,
-            body: googleError,
-          },
         });
       }
 
