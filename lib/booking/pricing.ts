@@ -1,5 +1,6 @@
 import type { ProductRecord } from "@/lib/products/types";
 import type { VisitorCounts } from "./types";
+import { calculateDiscountPercentage, calculateDiscountedTotal } from "@/lib/business/business-rules";
 
 export const PRICING = {
   adult: 50,
@@ -24,7 +25,10 @@ export type BookingPriceBreakdown = {
   equipmentTotal: number;
   singleItemTotal: number;
   additionalTotal: number;
-  total: number;
+  subtotal: number; // Before discount
+  discountPercentage: number; // 0-100
+  discountAmount: number; // Amount saved
+  total: number; // After discount (final amount to pay)
   lineItems: BookingPriceLineItem[];
 };
 
