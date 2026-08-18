@@ -161,8 +161,8 @@ const test3b = () => {
     selectedArea: { id: "area-2", name: "Braai Area", price: 350 },
     equipmentQuantities: { "chair-1": 10, "table-1": 2 },
     products: [
-      { id: "chair-1", name: "Plastic Chair", price: 20 },
-      { id: "table-1", name: "Plastic Table", price: 60 },
+      { id: "chair-1", name: "Plastic Chair", price: 20, category: "equipment", currency: "ZAR", is_active: true, is_bookable: true, is_free: false },
+      { id: "table-1", name: "Plastic Table", price: 60, category: "equipment", currency: "ZAR", is_active: true, is_bookable: true, is_free: false },
     ],
     bookingDate: "2025-01-02", // Same day (0 discount)
     creationDate: "2025-01-01",
