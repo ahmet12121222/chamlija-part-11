@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/components/site/language-provider";
 import { CHAMLIJA_MAPS_URL } from "@/lib/location";
@@ -38,6 +38,7 @@ const plannerStepOrder: PlannerStep[] = ["group", "people", "preferences", "acti
 export function ChamlijaAIChat() {
   const { language, t } = useLanguage();
   const router = useRouter();
+  const pathname = usePathname();
 
   const starterSuggestions = t("ai.quickActions", ["👋 Hello", "💰 Prices", "🌿 Activities", "👨‍👩‍👧 Family", "📍 Location", "📅 Reservation", "✨ Plan My Day"]);
 
@@ -60,6 +61,10 @@ export function ChamlijaAIChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, isOpen]);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   const sendMessage = (value?: string) => {
     const trimmed = (value ?? input).trim();
@@ -467,6 +472,7 @@ export function ChamlijaAIChat() {
                           ) : (
                             <Link
                               href={message.action.href}
+                              onClick={() => setIsOpen(false)}
                               className="inline-flex items-center justify-center rounded-full border border-[#d8ead9] bg-gradient-to-r from-[#edf8f2] to-[#eaf4ff] px-3 py-2 text-xs font-medium text-[#1d2a24] shadow-sm transition hover:-translate-y-0.5"
                             >
                               {message.action.label}
@@ -746,7 +752,7 @@ export function ChamlijaAIChat() {
                         type="button"
                         onClick={() => {
                           if (plannerState.step === "summary") {
-                            // Summary adımında Create Plan basılırsa, rezervasyon sayfasına git
+                            setIsOpen(false);
                             router.push("/book");
                             return;
                           }
