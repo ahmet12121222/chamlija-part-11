@@ -1,48 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 
 import { buildChamlijaAIResponse, type ChatResponse } from "@/lib/chamlija/chamlija-ai-improved";
-import { VERIFIED_CHAMLIJA_FACTS } from "@/lib/chamlija/verified-facts";
-
-const buildVerifiedContext = () => {
-  const facts = {
-    location: VERIFIED_CHAMLIJA_FACTS.location,
-    contact: VERIFIED_CHAMLIJA_FACTS.contact,
-    openingHours: VERIFIED_CHAMLIJA_FACTS.openingHours,
-    pricing: VERIFIED_CHAMLIJA_FACTS.pricing,
-    freeActivities: VERIFIED_CHAMLIJA_FACTS.freeActivities,
-    paidActivities: VERIFIED_CHAMLIJA_FACTS.paidActivities,
-    picnicAreas: VERIFIED_CHAMLIJA_FACTS.picnicAreas,
-    rules: VERIFIED_CHAMLIJA_FACTS.rules,
-    animals: VERIFIED_CHAMLIJA_FACTS.animals,
-  };
-
-  return `
-You are Chamlija AI, a customer support and sales assistant for this venue.
-
-STRICT RULES:
-- Use only the verified Chamlija facts below.
-- Never invent activities, products, facilities, prices, opening hours, capacity, policies, discounts, availability, or services.
-- If a fact is not explicitly present in the verified data, say: "I don't currently have verified information about that at Chamlija."
-- Do not claim things that are not present in the verified site data.
-- Recommend only from verified activities and services.
-- If the user asks about a non-existent offering, politely explain it is not currently part of Chamlija's verified list and suggest genuine options from the verified activities.
-- When the user asks for pricing, use the verified pricing data only.
-- Use natural, helpful, conversational English or Turkish as the user speaks.
-- Keep the reply practical, friendly, and sales-oriented when appropriate.
-- Prefer explicit consultation with real items from the verified lists when making recommendations.
-
-VERIFIED CHAMLIJA FACTS:
-${JSON.stringify(facts, null, 2)}
-
-IMPORTANT EXAMPLES:
-- If the user asks about horse riding or another activity not listed, respond with a clear, polite statement that it is not currently one of the verified activities offered at Chamlija and suggest verified alternatives.
-- If the user asks about family-friendly options, recommend only verified activities or areas from the lists above.
-- If the user asks about opening hours, use the verified schedule from the facts above.
-- If the user asks about booking or reservations, mention that reservations are handled through the site's booking flow and do not invent extra policies.
-- If there is no verified answer, do not guess.
-`;
-};
 
 const formatFallbackResponse = (response: ChatResponse): string => {
   const sections = response.sections
@@ -60,32 +18,7 @@ const formatFallbackResponse = (response: ChatResponse): string => {
     .filter(Boolean)
     .join("\n\n");
 
-  if (sections) {
-    return sections;
-  }
-
-  return "I don't currently have verified information about that at Chamlija.";
-};
-
-const getGeminiText = (payload: any): string => {
-  const candidateTexts = (payload?.candidates ?? [])
-    .map((candidate: any) => candidate?.content?.parts ?? [])
-    .flat()
-    .map((part: any) => (typeof part?.text === "string" ? part.text.trim() : ""))
-    .filter(Boolean);
-
-  if (candidateTexts.length === 0) {
-    const directText = typeof payload?.text === "string" ? payload.text.trim() : "";
-    return directText;
-  }
-
-  const joined = candidateTexts.join("\n");
-  const lines = joined
-    .split(/\n+/)
-    .map((line: string) => line.trim())
-    .filter(Boolean);
-
-  return [...new Set(lines)].join("\n");
+  return sections || "I don't currently have verified information about that at Chamlija.";
 };
 
 export async function POST(request: Request) {
@@ -114,70 +47,84 @@ export async function POST(request: Request) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: `Customer question: ${message}` }],
-          },
-        ],
-        config: {
-          systemInstruction: buildVerifiedContext(),
+      const geminiResponse = await fetch(geminiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: message }],
+            },
+          ],
+        }),
       });
 
-      const generatedText = getGeminiText(response as any);
+      const payload = await geminiResponse.json().catch(() => ({}));
 
-      if (generatedText) {
+      if (!geminiResponse.ok) {
+        const status = geminiResponse.status;
+        const googleError = payload?.error ?? payload ?? {};
+
         return NextResponse.json({
-          text: generatedText,
-          fallback: false,
-          source: "gemini",
-          debug: { reason: "gemini_ok" },
+          text: "GEMINI_ERROR",
+          fallback: true,
+          source: "gemini-error",
+          debug: {
+            status,
+            body: googleError,
+          },
         });
       }
 
-      const fallback = buildChamlijaAIResponse(message);
-      return NextResponse.json({
-        text: formatFallbackResponse(fallback),
-        fallback: true,
-        source: "fallback",
-        debug: { reason: "gemini_empty_response" },
-      });
-    } catch (geminiError: any) {
-      const status = geminiError?.status ?? geminiError?.response?.status ?? null;
-      const code = geminiError?.code ?? geminiError?.error?.code ?? null;
-      const errorMessage = geminiError?.message ?? geminiError?.error?.message ?? "Gemini request failed";
+      const generatedText =
+        payload?.candidates?.[0]?.content?.parts
+          ?.map((part: any) => typeof part?.text === "string" ? part.text : "")
+          .join("")
+          .trim() ?? "";
 
+      if (!generatedText) {
+        const fallbackResponse = buildChamlijaAIResponse(message);
+        return NextResponse.json({
+          text: formatFallbackResponse(fallbackResponse),
+          fallback: true,
+          source: "fallback",
+          debug: { reason: "gemini_empty_response" },
+        });
+      }
+
+      return NextResponse.json({
+        text: generatedText,
+        fallback: false,
+        source: "gemini",
+        debug: { reason: "gemini_ok" },
+      });
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "Gemini request failed";
       console.error("Gemini request failed", {
-        status,
-        code,
-        message: errorMessage,
+        status: null,
+        message: messageText,
+        errorStatus: null,
+        code: null,
       });
 
-      const fallback = buildChamlijaAIResponse(message);
+      const fallbackResponse = buildChamlijaAIResponse(message);
       return NextResponse.json({
-        text: formatFallbackResponse(fallback),
+        text: formatFallbackResponse(fallbackResponse),
         fallback: true,
         source: "fallback",
-        debug: {
-          reason: "gemini_error",
-          status,
-          code,
-          message: errorMessage,
-        },
+        debug: { reason: "gemini_exception", message: messageText },
       });
     }
   } catch (error) {
-    const fallbackMessage = typeof (error as Error)?.message === "string" ? (error as Error).message : "";
-    const fallbackResponse = buildChamlijaAIResponse((fallbackMessage || "I need help with Chamlija").replace(/^Gemini.*?:\s*/i, ""));
-
+    const fallbackMessage = error instanceof Error ? error.message : "Unknown server error";
     return NextResponse.json({
-      text: formatFallbackResponse(fallbackResponse),
+      text: "I don't currently have verified information about that at Chamlija.",
       fallback: true,
       source: "fallback",
       debug: { reason: "unknown_error", message: fallbackMessage },
