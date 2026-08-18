@@ -425,6 +425,34 @@ export default async function AdminDashboardPage({
                   refundModeInputs.forEach((input) => input.addEventListener('change', updateRefundAmountText));
                   refundAmountInput?.addEventListener('input', updateRefundAmountText);
                   updateRefundAmountText();
+
+                  const reviewForms = document.querySelectorAll('form[data-review-form="true"]');
+                  reviewForms.forEach((form) => {
+                    form.addEventListener('submit', async (event) => {
+                      event.preventDefault();
+                      const bookingId = form.getAttribute('data-booking-id') || '${selectedBooking.id}';
+
+                      try {
+                        const response = await fetch(form.action, {
+                          method: 'POST',
+                          body: new FormData(form),
+                          headers: { Accept: 'application/json' },
+                        });
+
+                        const result = await response.json().catch(() => ({}));
+
+                        if (!response.ok) {
+                          alert(result?.error || 'Unable to review payment.');
+                          return;
+                        }
+
+                        window.location.href = '/admin?bookingId=' + encodeURIComponent(bookingId);
+                      } catch (error) {
+                        console.error('Payment review failed:', error);
+                        alert('Unable to review payment.');
+                      }
+                    });
+                  });
                 })();
               `,
             }} />
