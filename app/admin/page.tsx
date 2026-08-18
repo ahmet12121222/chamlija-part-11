@@ -491,12 +491,14 @@ export default async function AdminDashboardPage({
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+                  type="button"
+                  data-cancel-booking-button="true"
+                  className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   Cancel Booking
                 </button>
               </div>
+              <div id="cancel-booking-message" hidden className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
             </form>
 
             {selectedBooking.payment_status === "refund_pending" && (
@@ -658,6 +660,92 @@ export default async function AdminDashboardPage({
 
                       target.textContent = originalText;
                       target.disabled = false;
+                    }
+                  });
+
+                  document.addEventListener('click', async (event) => {
+                    const cancelTarget = event.target instanceof Element ? event.target.closest('[data-cancel-booking-button="true"]') : null;
+                    if (!cancelTarget || !(cancelTarget instanceof HTMLElement)) {
+                      return;
+                    }
+
+                    const cancelForm = cancelTarget.closest('form');
+                    if (!cancelForm) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const cancelNotice = document.getElementById('cancel-booking-message');
+                    const cancelOriginalText = cancelTarget.textContent || 'Cancel Booking';
+
+                    cancelTarget.disabled = true;
+                    cancelTarget.textContent = 'Cancelling booking...';
+
+                    if (cancelNotice) {
+                      cancelNotice.hidden = true;
+                      cancelNotice.textContent = '';
+                      cancelNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
+                    }
+
+                    const requestUrl = cancelForm.action;
+                    const formData = new FormData(cancelForm);
+                    console.log('Cancel booking request URL:', requestUrl);
+                    console.log('Cancel booking request method: POST');
+                    console.log('Cancel booking request body:', Object.fromEntries(formData.entries()));
+
+                    try {
+                      const response = await fetch(requestUrl, {
+                        method: 'POST',
+                        body: formData,
+                      });
+
+                      const responseText = await response.text();
+                      let responseJson = {};
+                      try {
+                        responseJson = responseText ? JSON.parse(responseText) : {};
+                      } catch {
+                        responseJson = {};
+                      }
+
+                      console.log('Cancel booking response status:', response.status);
+                      console.log('Cancel booking response JSON:', responseJson);
+
+                      if (!response.ok) {
+                        const errorMessage = responseJson?.error || responseJson?.message || 'Booking cancellation failed.';
+                        const messageText = 'Booking cancellation failed: ' + errorMessage;
+                        if (cancelNotice) {
+                          cancelNotice.textContent = messageText;
+                          cancelNotice.hidden = false;
+                          cancelNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
+                        } else {
+                          alert(messageText);
+                        }
+                        return;
+                      }
+
+                      if (cancelNotice) {
+                        cancelNotice.textContent = 'Booking cancelled successfully.';
+                        cancelNotice.hidden = false;
+                        cancelNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700';
+                      }
+
+                      cancelTarget.textContent = 'Booking cancelled successfully.';
+                      cancelTarget.disabled = true;
+                    } catch (error) {
+                      console.error('Cancel booking failed:', error);
+                      const messageText = 'Booking cancellation failed: Network or server error.';
+                      if (cancelNotice) {
+                        cancelNotice.textContent = messageText;
+                        cancelNotice.hidden = false;
+                        cancelNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
+                      } else {
+                        alert(messageText);
+                      }
+
+                      cancelTarget.textContent = cancelOriginalText;
+                      cancelTarget.disabled = false;
                     }
                   });
                 })();
