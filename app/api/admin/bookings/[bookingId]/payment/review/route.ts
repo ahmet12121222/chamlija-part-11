@@ -2,6 +2,27 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminAccess } from "@/lib/auth/admin";
 
+function normalizePaymentMethod(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase().replace(/[-\s]+/g, "_");
+}
+
+function isBankTransferPaymentMethod(value: string | null | undefined) {
+  const normalized = normalizePaymentMethod(value);
+  const bankTransferMethods = new Set([
+    "bank_transfer",
+    "banktransfer",
+    "manual",
+    "manual_payment",
+    "manual_bank_transfer",
+    "manual_bank_payment",
+    "bank_transfer_manual",
+    "bank_transfer_manual_payment",
+    "bank_transfer_payment",
+  ]);
+
+  return bankTransferMethods.has(normalized) || normalized.includes("bank") || (normalized.includes("manual") && normalized.includes("bank"));
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ bookingId: string }> },
@@ -30,7 +51,7 @@ export async function POST(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    if (booking.payment_method !== "bank_transfer") {
+    if (!isBankTransferPaymentMethod(booking.payment_method)) {
       return NextResponse.json({ error: "This booking does not use bank transfer" }, { status: 400 });
     }
 

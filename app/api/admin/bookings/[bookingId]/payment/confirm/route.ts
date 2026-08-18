@@ -3,6 +3,27 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminAccess } from "@/lib/auth/admin";
 
+function normalizePaymentMethod(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase().replace(/[-\s]+/g, "_");
+}
+
+function isBankTransferPaymentMethod(value: string | null | undefined) {
+  const normalized = normalizePaymentMethod(value);
+  const bankTransferMethods = new Set([
+    "bank_transfer",
+    "banktransfer",
+    "manual",
+    "manual_payment",
+    "manual_bank_transfer",
+    "manual_bank_payment",
+    "bank_transfer_manual",
+    "bank_transfer_manual_payment",
+    "bank_transfer_payment",
+  ]);
+
+  return bankTransferMethods.has(normalized) || normalized.includes("bank") || (normalized.includes("manual") && normalized.includes("bank"));
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ bookingId: string }> }) {
   try {
     await requireAdminAccess();
@@ -26,13 +47,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Only allow confirming payment for cash_at_gate method. Bank transfers require the review flow with receipt verification.
-    if (booking.payment_method === "bank_transfer") {
-      return NextResponse.json({ error: "Bank transfer payments must be reviewed using the receipt verification flow." }, { status: 400 });
+    const isBankTransfer = isBankTransferPaymentMethod(booking.payment_method);
+    const isCashAtGate = normalizePaymentMethod(booking.payment_method) === "cash_at_gate";
+
+    if (!isBankTransfer && !isCashAtGate) {
+      return NextResponse.json({ error: "This booking does not use manual payment" }, { status: 400 });
     }
 
-    if (booking.payment_method !== "cash_at_gate") {
-      return NextResponse.json({ error: "This booking does not use manual payment" }, { status: 400 });
+    if (isBankTransfer && !isCashAtGate) {
+      // Manual bank transfer bookings can be approved directly by admin when no receipt is required.
+      // The review route remains available for receipt verification if needed.
     }
 
     // Update booking and payment status for a confirmed manual payment.

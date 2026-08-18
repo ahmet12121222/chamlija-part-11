@@ -78,7 +78,22 @@ function isBankTransferMethod(value: string | null | undefined) {
 }
 
 function isPendingBankTransferBooking(booking: { payment_status?: string | null; payment_method?: string | null }) {
-  if (String(booking.payment_status ?? "").trim().toLowerCase() !== "pending") {
+  const paymentStatus = String(booking.payment_status ?? "").trim().toLowerCase();
+  if (!paymentStatus) {
+    return false;
+  }
+
+  const allowedPendingStates = new Set([
+    "pending",
+    "pending_payment",
+    "receipt_required",
+    "receipt_uploaded",
+    "under_review",
+    "manual_review",
+    "verification_pending",
+  ]);
+
+  if (!allowedPendingStates.has(paymentStatus)) {
     return false;
   }
 
@@ -356,7 +371,7 @@ export default async function AdminDashboardPage({
               </div>
             )}
 
-            {selectedBooking.payment_method === "bank_transfer" && (
+            {isBankTransferMethod(selectedBooking.payment_method) && (
               <div className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="text-sm font-semibold text-sky-900">Bank transfer review</div>
                 <p className="mt-2 text-sm text-sky-800">Review the proof of payment upload before approving the booking.</p>
@@ -550,13 +565,12 @@ export default async function AdminDashboardPage({
                       }
 
                       try {
+                        const formData = new FormData();
+                        formData.append('action', 'approve');
+
                         const response = await fetch('/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review', {
                           method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                          },
-                          body: JSON.stringify({ action: 'approve' }),
+                          body: formData,
                         });
 
                         const result = await response.json().catch(() => ({}));
