@@ -11,6 +11,31 @@ function formatMoney(value: number | null | undefined) {
   return `R${Number.isFinite(numeric) ? numeric.toFixed(2) : "0.00"}`;
 }
 
+function normalizePaymentMethod(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase().replace(/[-\s]+/g, "_");
+}
+
+function isPendingBankTransferBooking(booking: { payment_status?: string | null; payment_method?: string | null }) {
+  if (booking.payment_status !== "pending") {
+    return false;
+  }
+
+  const method = normalizePaymentMethod(booking.payment_method);
+  const allowedMethods = new Set([
+    "bank_transfer",
+    "banktransfer",
+    "manual",
+    "manual_payment",
+    "manual_bank_transfer",
+    "manual_bank_payment",
+    "bank_transfer_manual",
+    "bank_transfer_manual_payment",
+    "bank_transfer_payment",
+  ]);
+
+  return allowedMethods.has(method);
+}
+
 export default async function AdminDashboardPage({
   searchParams,
 }: {
@@ -47,6 +72,7 @@ export default async function AdminDashboardPage({
 
   const items = bookings ?? [];
   const selectedBooking = items.find((booking) => booking.id === selectedBookingId) ?? null;
+  const pendingBankTransferBooking = selectedBooking ? isPendingBankTransferBooking(selectedBooking) : false;
   const selectedPayment = selectedBooking
     ? (
         await supabaseAdmin
@@ -166,7 +192,7 @@ export default async function AdminDashboardPage({
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking Status</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{formatStatus(selectedBooking.booking_status)}</div>
+                <div data-booking-status-display className="mt-2 text-sm font-semibold text-slate-900">{formatStatus(selectedBooking.booking_status)}</div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact</div>
@@ -189,7 +215,7 @@ export default async function AdminDashboardPage({
                 </div>
                 <div>
                   <span className="text-xs text-slate-600">Status:</span>
-                  <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatStatus(selectedBooking.payment_status)}</span>
+                  <span data-payment-status-display className="ml-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatStatus(selectedBooking.payment_status)}</span>
                 </div>
                 <div>
                   <span className="text-xs text-slate-600">Amount:</span>
@@ -221,25 +247,19 @@ export default async function AdminDashboardPage({
               </div>
             )}
 
-            {selectedBooking.payment_status === "pending" && selectedBooking.payment_method === "bank_transfer" && (
-              <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            {pendingBankTransferBooking && (
+              <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" data-confirm-payment-panel>
                 <div className="text-sm font-semibold text-emerald-900">Confirm Payment</div>
-                <p className="mt-2 text-sm text-emerald-800">The payment is pending. Verify the bank transfer receipt to confirm and finalize this booking.</p>
+                <p className="mt-2 text-sm text-emerald-800">The payment is pending. Confirm the bank transfer to finalize this booking.</p>
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <form
-                    action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST"
-                    data-review-form="true"
-                    data-review-action="approve"
+                  <button
+                    type="button"
+                    data-confirm-payment-button="true"
                     data-booking-id={selectedBooking.id}
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
                   >
-                    <input type="hidden" name="action" value="approve" />
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                    >
-                      Confirm Payment
-                    </button>
-                  </form>
+                    Confirm Payment
+                  </button>
                 </div>
               </div>
             )}
@@ -426,30 +446,49 @@ export default async function AdminDashboardPage({
                   refundAmountInput?.addEventListener('input', updateRefundAmountText);
                   updateRefundAmountText();
 
-                  const reviewForms = document.querySelectorAll('form[data-review-form="true"]');
-                  reviewForms.forEach((form) => {
-                    form.addEventListener('submit', async (event) => {
+                  const confirmButtons = document.querySelectorAll('[data-confirm-payment-button="true"]');
+                  confirmButtons.forEach((button) => {
+                    button.addEventListener('click', async (event) => {
                       event.preventDefault();
-                      const bookingId = form.getAttribute('data-booking-id') || '${selectedBooking.id}';
+                      event.stopPropagation();
+
+                      const bookingId = button.getAttribute('data-booking-id');
+                      if (!bookingId) {
+                        return;
+                      }
 
                       try {
-                        const response = await fetch(form.action, {
+                        const response = await fetch('/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review', {
                           method: 'POST',
-                          body: new FormData(form),
-                          headers: { Accept: 'application/json' },
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                          },
+                          body: JSON.stringify({ action: 'approve' }),
                         });
 
                         const result = await response.json().catch(() => ({}));
-
                         if (!response.ok) {
-                          alert(result?.error || 'Unable to review payment.');
+                          alert(result?.error || 'Unable to confirm payment.');
                           return;
                         }
 
-                        window.location.href = '/admin?bookingId=' + encodeURIComponent(bookingId);
+                        const paymentStatusNode = document.querySelector('[data-payment-status-display]');
+                        const bookingStatusNode = document.querySelector('[data-booking-status-display]');
+                        if (paymentStatusNode) {
+                          paymentStatusNode.textContent = 'Paid';
+                        }
+                        if (bookingStatusNode) {
+                          bookingStatusNode.textContent = 'Confirmed';
+                        }
+
+                        const paymentPanel = document.querySelector('[data-confirm-payment-panel]');
+                        if (paymentPanel) {
+                          paymentPanel.remove();
+                        }
                       } catch (error) {
-                        console.error('Payment review failed:', error);
-                        alert('Unable to review payment.');
+                        console.error('Confirm payment failed:', error);
+                        alert('Unable to confirm payment.');
                       }
                     });
                   });
