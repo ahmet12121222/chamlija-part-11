@@ -67,6 +67,27 @@ const formatFallbackResponse = (response: ChatResponse): string => {
   return "I don't currently have verified information about that at Chamlija.";
 };
 
+const getGeminiText = (payload: any): string => {
+  const candidateTexts = (payload?.candidates ?? [])
+    .map((candidate: any) => candidate?.content?.parts ?? [])
+    .flat()
+    .map((part: any) => (typeof part?.text === "string" ? part.text.trim() : ""))
+    .filter(Boolean);
+
+  if (candidateTexts.length === 0) {
+    const directText = typeof payload?.text === "string" ? payload.text.trim() : "";
+    return directText;
+  }
+
+  const joined = candidateTexts.join("\n");
+  const lines = joined
+    .split(/\n+/)
+    .map((line: string) => line.trim())
+    .filter(Boolean);
+
+  return [...new Set(lines)].join("\n");
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -76,6 +97,8 @@ export async function POST(request: Request) {
       return NextResponse.json({
         text: "Please ask me something about Chamlija and I’ll help using the verified information available on the site.",
         fallback: true,
+        source: "fallback",
+        debug: { reason: "empty_message" },
       });
     }
 
@@ -86,47 +109,69 @@ export async function POST(request: Request) {
       return NextResponse.json({
         text: formatFallbackResponse(fallbackResponse),
         fallback: true,
-        source: "rule-based",
+        source: "fallback",
+        debug: { reason: "missing_api_key" },
       });
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `Customer question: ${message}` }],
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `Customer question: ${message}` }],
+          },
+        ],
+        config: {
+          systemInstruction: buildVerifiedContext(),
         },
-      ],
-      config: {
-        systemInstruction: buildVerifiedContext(),
-      },
-    });
+      });
 
-    const generatedText =
-      (typeof (response as any)?.text === "string" && (response as any)?.text.trim())
-        ? (response as any).text
-        : (response as any)?.candidates
-          ?.flatMap((candidate: any) => candidate?.content?.parts ?? [])
-          .map((part: any) => part?.text ?? "")
-          .join("\n")
-          .trim();
+      const generatedText = getGeminiText(response as any);
 
-    if (generatedText) {
+      if (generatedText) {
+        return NextResponse.json({
+          text: generatedText,
+          fallback: false,
+          source: "gemini",
+          debug: { reason: "gemini_ok" },
+        });
+      }
+
+      const fallback = buildChamlijaAIResponse(message);
       return NextResponse.json({
-        text: generatedText,
-        fallback: false,
-        source: "gemini",
+        text: formatFallbackResponse(fallback),
+        fallback: true,
+        source: "fallback",
+        debug: { reason: "gemini_empty_response" },
+      });
+    } catch (geminiError: any) {
+      const status = geminiError?.status ?? geminiError?.response?.status ?? null;
+      const code = geminiError?.code ?? geminiError?.error?.code ?? null;
+      const errorMessage = geminiError?.message ?? geminiError?.error?.message ?? "Gemini request failed";
+
+      console.error("Gemini request failed", {
+        status,
+        code,
+        message: errorMessage,
+      });
+
+      const fallback = buildChamlijaAIResponse(message);
+      return NextResponse.json({
+        text: formatFallbackResponse(fallback),
+        fallback: true,
+        source: "fallback",
+        debug: {
+          reason: "gemini_error",
+          status,
+          code,
+          message: errorMessage,
+        },
       });
     }
-
-    const fallback = buildChamlijaAIResponse(message);
-    return NextResponse.json({
-      text: formatFallbackResponse(fallback),
-      fallback: true,
-      source: "rule-based",
-    });
   } catch (error) {
     const fallbackMessage = typeof (error as Error)?.message === "string" ? (error as Error).message : "";
     const fallbackResponse = buildChamlijaAIResponse((fallbackMessage || "I need help with Chamlija").replace(/^Gemini.*?:\s*/i, ""));
@@ -134,7 +179,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       text: formatFallbackResponse(fallbackResponse),
       fallback: true,
-      source: "rule-based",
+      source: "fallback",
+      debug: { reason: "unknown_error", message: fallbackMessage },
     });
   }
 }
