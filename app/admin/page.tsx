@@ -554,96 +554,61 @@ export default async function AdminDashboardPage({
                   refundAmountInput?.addEventListener('input', updateRefundAmountText);
                   updateRefundAmountText();
 
-                  const confirmButtons = document.querySelectorAll('[data-confirm-payment-button="true"]');
-                  confirmButtons.forEach((button) => {
-                    button.addEventListener('click', async (event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
+                  document.addEventListener('click', async (event) => {
+                    const target = event.target instanceof Element ? event.target.closest('[data-confirm-payment-button="true"]') : null;
+                    if (!target || !(target instanceof HTMLElement)) {
+                      return;
+                    }
 
-                      const bookingId = button.getAttribute('data-booking-id');
-                      if (!bookingId) {
-                        return;
-                      }
+                    event.preventDefault();
+                    event.stopPropagation();
 
-                      const paymentNotice = document.getElementById('payment-confirmation-message');
-                      const originalText = button.textContent || 'Confirm Payment';
+                    const bookingId = target.getAttribute('data-booking-id');
+                    if (!bookingId) {
+                      return;
+                    }
 
-                      button.disabled = true;
-                      button.textContent = 'Confirming payment...';
+                    const paymentNotice = document.getElementById('payment-confirmation-message');
+                    const originalText = target.textContent || 'Confirm Payment';
 
-                      if (paymentNotice) {
-                        paymentNotice.hidden = true;
-                        paymentNotice.textContent = '';
-                        paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-700';
-                      }
+                    target.disabled = true;
+                    target.textContent = 'Confirming payment...';
 
-                      const requestUrl = '/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review';
-                      console.log('Confirm payment request URL:', requestUrl);
+                    if (paymentNotice) {
+                      paymentNotice.hidden = true;
+                      paymentNotice.textContent = '';
+                      paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-700';
+                    }
 
+                    const requestUrl = '/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review';
+                    console.log('Confirm payment request URL:', requestUrl);
+
+                    try {
+                      const formData = new FormData();
+                      formData.append('action', 'approve');
+
+                      console.log('Confirm payment request method: POST');
+                      console.log('Confirm payment request body:', { action: 'approve' });
+
+                      const response = await fetch(requestUrl, {
+                        method: 'POST',
+                        body: formData,
+                      });
+
+                      const responseText = await response.text();
+                      let responseJson = {};
                       try {
-                        const formData = new FormData();
-                        formData.append('action', 'approve');
+                        responseJson = responseText ? JSON.parse(responseText) : {};
+                      } catch {
+                        responseJson = {};
+                      }
 
-                        console.log('Confirm payment request method: POST');
-                        console.log('Confirm payment request body:', { action: 'approve' });
+                      console.log('Confirm payment response status:', response.status);
+                      console.log('Confirm payment response JSON:', responseJson);
 
-                        const response = await fetch(requestUrl, {
-                          method: 'POST',
-                          body: formData,
-                        });
-
-                        const responseText = await response.text();
-                        let responseJson = {};
-                        try {
-                          responseJson = responseText ? JSON.parse(responseText) : {};
-                        } catch {
-                          responseJson = {};
-                        }
-
-                        console.log('Confirm payment response status:', response.status);
-                        console.log('Confirm payment response JSON:', responseJson);
-
-                        if (!response.ok) {
-                          const errorMessage = responseJson?.error || responseJson?.message || 'Payment confirmation failed.';
-                          const messageText = 'Payment confirmation failed: ' + errorMessage;
-
-                          if (paymentNotice) {
-                            paymentNotice.textContent = messageText;
-                            paymentNotice.hidden = false;
-                            paymentNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
-                          } else {
-                            alert(messageText);
-                          }
-                          return;
-                        }
-
-                        const paymentStatusNode = document.querySelector('[data-payment-status-display]');
-                        const bookingStatusNode = document.querySelector('[data-booking-status-display]');
-                        if (paymentStatusNode) {
-                          paymentStatusNode.textContent = 'Paid';
-                        }
-                        if (bookingStatusNode) {
-                          bookingStatusNode.textContent = 'Confirmed';
-                        }
-
-                        const paymentPanel = document.querySelector('[data-confirm-payment-panel]');
-                        if (paymentPanel) {
-                          paymentPanel.classList.add('border-emerald-300');
-                        }
-
-                        if (paymentNotice) {
-                          paymentNotice.textContent = 'Payment confirmed successfully.';
-                          paymentNotice.hidden = false;
-                          paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700';
-                        }
-
-                        const successText = 'Payment confirmed successfully.';
-                        console.log(successText);
-                        button.textContent = successText;
-                        button.disabled = true;
-                      } catch (error) {
-                        console.error('Confirm payment failed:', error);
-                        const messageText = 'Payment confirmation failed: Network or server error.';
+                      if (!response.ok) {
+                        const errorMessage = responseJson?.error || responseJson?.message || 'Payment confirmation failed.';
+                        const messageText = 'Payment confirmation failed: ' + errorMessage;
 
                         if (paymentNotice) {
                           paymentNotice.textContent = messageText;
@@ -652,11 +617,48 @@ export default async function AdminDashboardPage({
                         } else {
                           alert(messageText);
                         }
-
-                        button.textContent = originalText;
-                        button.disabled = false;
+                        return;
                       }
-                    });
+
+                      const paymentStatusNode = document.querySelector('[data-payment-status-display]');
+                      const bookingStatusNode = document.querySelector('[data-booking-status-display]');
+                      if (paymentStatusNode) {
+                        paymentStatusNode.textContent = 'Paid';
+                      }
+                      if (bookingStatusNode) {
+                        bookingStatusNode.textContent = 'Confirmed';
+                      }
+
+                      const paymentPanel = document.querySelector('[data-confirm-payment-panel]');
+                      if (paymentPanel) {
+                        paymentPanel.classList.add('border-emerald-300');
+                      }
+
+                      if (paymentNotice) {
+                        paymentNotice.textContent = 'Payment confirmed successfully.';
+                        paymentNotice.hidden = false;
+                        paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700';
+                      }
+
+                      const successText = 'Payment confirmed successfully.';
+                      console.log(successText);
+                      target.textContent = successText;
+                      target.disabled = true;
+                    } catch (error) {
+                      console.error('Confirm payment failed:', error);
+                      const messageText = 'Payment confirmation failed: Network or server error.';
+
+                      if (paymentNotice) {
+                        paymentNotice.textContent = messageText;
+                        paymentNotice.hidden = false;
+                        paymentNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
+                      } else {
+                        alert(messageText);
+                      }
+
+                      target.textContent = originalText;
+                      target.disabled = false;
+                    }
                   });
                 })();
               `,
