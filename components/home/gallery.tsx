@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { GALLERY_IMAGES } from "@/lib/media/chamlija-images";
 
@@ -9,6 +9,35 @@ export function Gallery() {
   const touchStartX = useRef<number | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [cardWidth, setCardWidth] = useState(0);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const syncViewport = () => setIsMobile(mediaQuery.matches);
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile || !scrollRef.current) return;
+
+    const firstChild = scrollRef.current.querySelector<HTMLElement>("[data-gallery-card]");
+    if (!firstChild) return;
+
+    const gap = 24;
+    setCardWidth(firstChild.offsetWidth + gap);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setActiveIndex((previous) => Math.min(Math.max(previous, 0), GALLERY_IMAGES.length - 1));
+    }
+  }, [isMobile]);
 
   const updateScrollState = () => {
     const container = scrollRef.current;
@@ -17,6 +46,11 @@ export function Gallery() {
     const maxScrollLeft = container.scrollWidth - container.clientWidth;
     setCanScrollLeft(container.scrollLeft > 8);
     setCanScrollRight(container.scrollLeft < maxScrollLeft - 8);
+  };
+
+  const goToIndex = (index: number) => {
+    const boundedIndex = Math.max(0, Math.min(index, GALLERY_IMAGES.length - 1));
+    setActiveIndex(boundedIndex);
   };
 
   const scrollGallery = (direction: "left" | "right") => {
@@ -40,11 +74,23 @@ export function Gallery() {
     if (touchStartX.current === null) return;
 
     const delta = event.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(delta) > 40) {
-      scrollGallery(delta < 0 ? "right" : "left");
-    }
     touchStartX.current = null;
+
+    if (Math.abs(delta) <= 40) return;
+
+    if (isMobile) {
+      if (delta < 0) {
+        goToIndex(activeIndex + 1);
+      } else {
+        goToIndex(activeIndex - 1);
+      }
+      return;
+    }
+
+    scrollGallery(delta < 0 ? "right" : "left");
   };
+
+  const translateX = isMobile ? -(activeIndex * cardWidth) : 0;
 
   return (
     <section id="gallery" className="scroll-mt-24 bg-gradient-to-b from-[#f7f4ee] via-[#f2ede3] to-[#eae5d8] px-4 py-16 sm:px-8 lg:px-10 lg:py-28">
@@ -86,30 +132,33 @@ export function Gallery() {
           onScroll={updateScrollState}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={`mt-10 ${isMobile ? "overflow-hidden" : "overflow-x-auto"} pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
         >
-          {GALLERY_IMAGES.map((image) => (
-            <div
-              key={image.id}
-              data-gallery-card
-              className="group relative min-w-[82vw] shrink-0 snap-center sm:min-w-[32%]"
-            >
-              <div className="relative h-[24rem] w-full overflow-hidden sm:h-[28rem]" style={{
-                clipPath: 'polygon(15% 0%, 85% 0%, 100% 15%, 100% 85%, 85% 100%, 15% 100%, 0% 85%, 0% 15%)'
-              }}>
-                <Image
-                  src={image.src}
-                  alt={image.alt}
-                  fill
-                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
-                  sizes="(max-width: 640px) 82vw, (max-width: 1024px) 42vw, 32vw"
-                  style={{
-                    objectPosition: 'center'
-                  }}
-                />
+          <div
+            className={`flex ${isMobile ? "gap-6" : "snap-x snap-mandatory gap-6"}`}
+            style={isMobile ? { transform: `translate3d(${translateX}px, 0, 0)`, transition: "transform 240ms ease-out" } : undefined}
+          >
+            {GALLERY_IMAGES.map((image) => (
+              <div
+                key={image.id}
+                data-gallery-card
+                className={`group relative shrink-0 ${isMobile ? "min-w-[82vw]" : "min-w-[82vw] snap-center sm:min-w-[32%]"}`}
+              >
+                <div className="relative h-[24rem] w-full overflow-hidden sm:h-[28rem]" style={{
+                  clipPath: "polygon(15% 0%, 85% 0%, 100% 15%, 100% 85%, 85% 100%, 15% 100%, 0% 85%, 0% 15%)",
+                }}>
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    fill
+                    className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                    sizes="(max-width: 640px) 82vw, (max-width: 1024px) 42vw, 32vw"
+                    style={{ objectPosition: "center" }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>

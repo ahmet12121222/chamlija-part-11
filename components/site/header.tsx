@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES, getLanguageMeta, type LanguageCode } from "@/locales";
 import { useLanguage } from "@/components/site/language-provider";
+import { CHAMLIJA_LOCATION, CHAMLIJA_MAPS_URL } from "@/lib/location";
 
 function GlobeIcon({ className }: { className?: string }) {
   return (
@@ -40,6 +41,13 @@ export function SiteHeader() {
     setIsMenuOpen(false);
     setIsLanguageOpen(false);
   };
+
+  const contactItems = [
+    { label: "Phone", value: "+27 062 087 3208", href: "tel:+270620873208" },
+    { label: "WhatsApp", value: "Chat on WhatsApp", href: "https://wa.me/27620873208?text=Hi%20Chamlija" },
+    { label: "Email", value: "buyukchamlija@uict.org.za", href: "mailto:buyukchamlija@uict.org.za" },
+    { label: "Location", value: CHAMLIJA_LOCATION.address, href: CHAMLIJA_MAPS_URL },
+  ];
 
   const NAV_LINKS = [
     { label: t("nav.home", "Home"), href: "#home" },
@@ -294,60 +302,143 @@ export function SiteHeader() {
 
         <div
           ref={menuPanelRef}
-          className={`absolute inset-y-0 right-0 flex w-[86vw] max-w-[20rem] flex-col justify-between bg-[#132a23] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-20 shadow-[0_25px_60px_rgba(20,37,29,0.28)] transition-all duration-300 ${
+          className={`absolute inset-y-0 right-0 flex w-[86vw] max-w-[20rem] flex-col overflow-hidden bg-[#132a23] shadow-[0_25px_60px_rgba(20,37,29,0.28)] transition-all duration-300 ${
             isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
           }`}
         >
-          <nav className="flex flex-col gap-1 overflow-y-auto">
-            {NAV_LINKS.map((link, index) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMenuOpen(false)}
-                style={{ transitionDelay: isMenuOpen ? `${index * 40}ms` : "0ms" }}
-                className={`border-b border-white/10 py-4 text-xl font-semibold uppercase tracking-[0.08em] text-white/90 transition duration-300 hover:text-[#e8d7bf] ${
-                  isMenuOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
-                }`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-          <div className="mt-8 space-y-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-2">
-              <div className="flex items-center justify-between gap-2 text-white/80">
-                <span className="text-[10px] uppercase tracking-[0.12em]">Language</span>
-                <span className="flex items-center gap-2 text-sm font-medium"><span>{getLanguageMeta(language).flag}</span>{getLanguageMeta(language).label}</span>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {LANGUAGES.map((item) => (
-                  <button
-                    key={item.code}
-                    type="button"
-                    onClick={() => {
-                      setLanguage(item.code as LanguageCode);
-                      closeAllMenus();
-                    }}
-                    className={`rounded-xl border px-2.5 py-2 text-left text-xs ${
-                      language === item.code ? "border-[#dff7e8] bg-white/10 text-white" : "border-white/10 bg-transparent text-white/70"
-                    }`}
+          <div className="flex items-center justify-between border-b border-white/10 px-5 pb-4 pt-5">
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#d7d9c6]">Menu</p>
+              <p className="mt-2 text-lg font-semibold text-white">Chamlija</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(false)}
+              aria-label="Close menu"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d7d9c6]">Navigation</p>
+              <nav className="mt-3 flex flex-col gap-1">
+                {NAV_LINKS.map((link, index) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    style={{ transitionDelay: isMenuOpen ? `${index * 40}ms` : "0ms" }}
+                    className="rounded-2xl border border-white/8 bg-white/3 px-3 py-3 text-base font-medium text-white/90 transition hover:bg-white/6"
                   >
-                    {item.flag} {item.label}
-                  </button>
+                    {link.label}
+                  </a>
                 ))}
-              </div>
+              </nav>
             </div>
 
             <Link
               href="/book"
               onClick={() => setIsMenuOpen(false)}
-              className="flex items-center justify-center rounded-full bg-[#dca77d] px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-[#14251d] shadow-lg shadow-[#dca77d]/30"
+              className="flex items-center justify-center rounded-full bg-[#dca77d] px-5 py-3 text-sm font-bold uppercase tracking-[0.14em] text-[#14251d] shadow-lg shadow-[#dca77d]/30"
             >
               {t("nav.reservation", "Book Now")}
             </Link>
+
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d7d9c6]">Contact</p>
+              <div className="mt-3 space-y-2">
+                {contactItems.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target={item.href.startsWith("http") ? "_blank" : undefined}
+                    rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-start justify-between gap-3 rounded-2xl border border-white/8 bg-white/3 px-3 py-2.5 text-sm text-white/80"
+                  >
+                    <span className="font-medium text-[#d7d9c6]">{item.label}</span>
+                    <span className="text-right text-white/90">{item.value}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsLanguageOpen(true)}
+                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm text-white/90"
+              >
+                <span className="font-medium text-[#d7d9c6]">Language</span>
+                <span className="flex items-center gap-2">
+                  <span>{getLanguageMeta(language).flag}</span>
+                  <span>{getLanguageMeta(language).label}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-white/70">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m7 10 5 5 5-5" />
+                  </svg>
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {isLanguageOpen && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#14251d]/45 p-3 backdrop-blur-[2px] sm:items-center" onClick={() => setIsLanguageOpen(false)}>
+          <div
+            ref={languagePanelRef}
+            className="w-full max-w-[390px] overflow-hidden rounded-[1.5rem] border border-[#dfe8df] bg-[#f8f6f1] shadow-[0_24px_60px_rgba(20,37,29,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#dfe8df] px-4 py-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a8462]">Language</p>
+                <p className="mt-1 text-sm font-semibold text-[#14251d]">Choose your language</p>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#dfe8df] bg-white text-[#14251d] transition hover:bg-[#edf6ee]"
+                onClick={() => setIsLanguageOpen(false)}
+                aria-label="Close language selector"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {LANGUAGES.map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => {
+                    setLanguage(item.code as LanguageCode);
+                    setIsLanguageOpen(false);
+                    setIsMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition active:scale-[0.99] ${
+                    language === item.code
+                      ? "border-[#cfe8d6] bg-[#edf6ee] text-[#14251d] shadow-sm"
+                      : "border-[#e4e7df] bg-white text-[#3d4d45] hover:bg-[#f3f7f4]"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-base">{item.flag}</span>
+                    <span className="font-medium">{item.label}</span>
+                  </span>
+                  {language === item.code && <span className="text-xs font-bold text-[#19352a]">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
