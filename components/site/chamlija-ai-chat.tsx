@@ -115,7 +115,10 @@ export function ChamlijaAIChat() {
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({
+          message: trimmed,
+          messages: [...messages, userMessage],
+        }),
       });
 
       const data = await response.json().catch(() => ({}));
