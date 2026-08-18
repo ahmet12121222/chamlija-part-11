@@ -54,6 +54,24 @@ function formatGuestCount(booking: { adults?: number | null; children_3_plus?: n
   return `${total} guest${total === 1 ? "" : "s"}`;
 }
 
+function formatDisplayStatusLabel(value: string | null | undefined) {
+  const normalized = String(value ?? "pending").trim().toLowerCase();
+
+  if (normalized === "pending") return "Pending";
+  if (normalized === "paid") return "Paid";
+  if (normalized === "partially_paid") return "Partially Paid";
+  if (normalized === "outstanding") return "Outstanding";
+  if (normalized === "refund_pending") return "Refund Pending";
+  if (normalized === "refunded") return "Refunded";
+  if (normalized === "cancelled" || normalized === "canceled") return "Cancelled";
+  if (normalized === "confirmed") return "Confirmed";
+  if (normalized === "completed") return "Completed";
+  if (normalized === "failed") return "Failed";
+  if (normalized === "rejected") return "Rejected";
+
+  return formatStatus(value);
+}
+
 function formatBookingStatus(status: string | null | undefined) {
   const normalized = String(status ?? "pending").trim().toLowerCase();
   if (normalized === "confirmed" || normalized === "paid") return "Confirmed";
@@ -292,16 +310,29 @@ export default async function AdminDashboardPage({
 
   const items = bookings ?? [];
   const areaIds = [...new Set(items.map((booking) => booking.selected_area_id).filter((value): value is string => typeof value === "string" && value.trim().length > 0))];
-  const areaLookup = areaIds.length
+  const allProductIds = [...new Set(
+    items.flatMap((booking) => {
+      const ids: string[] = [];
+      if (typeof booking.selected_area_id === "string" && booking.selected_area_id.trim()) ids.push(booking.selected_area_id);
+      if (Array.isArray(booking.selected_equipment_ids)) ids.push(...booking.selected_equipment_ids.filter((value): value is string => typeof value === "string" && value.trim().length > 0));
+      return ids;
+    })
+  )];
+
+  const productLookup: Record<string, string> = allProductIds.length
     ? Object.fromEntries(
         (
           await supabaseAdmin
             .from("products")
             .select("id, name")
-            .in("id", areaIds)
-        )?.data?.map((area) => [area.id, area.name]) ?? []
+            .in("id", allProductIds)
+        )?.data?.map((product) => [product.id, product.name]) ?? []
       )
     : {};
+
+  const areaLookup: Record<string, string> = Object.fromEntries(
+    Object.entries(productLookup).filter(([id]) => areaIds.includes(id))
+  );
 
   const filteredItems = items.filter((booking) => {
     const normalizedMethod = normalizePaymentMethod(booking.payment_method);
@@ -385,6 +416,14 @@ export default async function AdminDashboardPage({
       )?.data ?? null
     : null;
   const refundAmountDue = Number(selectedPayment?.refund_amount ?? selectedPayment?.amount ?? selectedBooking?.total_price ?? 0);
+  const paidAmount = Number(selectedPayment?.amount ?? 0);
+  const outstandingBalance = selectedBooking && paidAmount > 0 ? Math.max(Number(selectedBooking.total_price ?? 0) - paidAmount, 0) : null;
+  const additionalServiceNames = selectedBooking
+    ? (Array.isArray(selectedBooking.selected_equipment_ids) ? selectedBooking.selected_equipment_ids : [])
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .map((value) => productLookup[value] || "Service")
+        .filter(Boolean)
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
@@ -652,70 +691,64 @@ export default async function AdminDashboardPage({
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
                   <div><span className="text-slate-500">Booking Status:</span> <span className="font-medium text-slate-900">{formatBookingStatus(selectedBooking.booking_status)}</span></div>
-                  <div><span className="text-slate-500">Payment Status:</span> <span className="font-medium text-slate-900">{formatPaymentStatus(selectedBooking.payment_status)}</span></div>
+                  <div><span className="text-slate-500">Payment Status:</span> <span className="font-medium text-slate-900">{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
                   <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Reference</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{formatShortReference(selectedBooking.reservation_code || selectedBooking.id)}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Amount</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{formatMoney(selectedBooking.total_price)}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Date</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{formatDisplayDate(selectedBooking.booking_date)}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{formatDisplayTime(selectedBooking.booking_time)}</div>
                 </div>
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-900">Customer</div>
-                  <div className="mt-3 space-y-2 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Name:</span> <span className="font-medium text-slate-900">{selectedBooking.customer_name || "Unknown"}</span></div>
-                    <div><span className="text-slate-500">Email:</span> <span className="font-medium text-slate-900">{selectedBooking.email || "No email"}</span></div>
-                    <div><span className="text-slate-500">Phone:</span> <span className="font-medium text-slate-900">{selectedBooking.phone_number || "No phone number"}</span></div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-900">Booking</div>
-                  <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  <div className="text-sm font-semibold text-slate-900">Booking Summary</div>
+                  <div className="mt-3 space-y-3 text-sm text-slate-700">
                     <div><span className="text-slate-500">Reference:</span> <span className="font-medium text-slate-900">{selectedBooking.reservation_code || formatShortReference(selectedBooking.id)}</span></div>
-                    <div><span className="text-slate-500">Area:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_area_id ? areaLookup[selectedBooking.selected_area_id] || "Selected area" : "Not selected"}</span></div>
+                    <div><span className="text-slate-500">Customer:</span> <span className="font-medium text-slate-900">{selectedBooking.customer_name || "Unknown"}</span></div>
+                    <div><span className="text-slate-500">Date:</span> <span className="font-medium text-slate-900">{formatDisplayDate(selectedBooking.booking_date)}</span></div>
+                    <div><span className="text-slate-500">Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBooking.booking_status)}`}>{formatBookingStatus(selectedBooking.booking_status)}</span></div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-semibold text-slate-900">Payment Summary</div>
+                  <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                    <div><span className="text-slate-500">Total:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
+                    <div><span className="text-slate-500">Paid:</span> <span className="font-medium text-slate-900">{selectedPayment?.amount ? formatMoney(Number(selectedPayment.amount)) : "Not available"}</span></div>
+                    <div><span className="text-slate-500">Outstanding:</span> <span className="font-medium text-slate-900">{outstandingBalance !== null ? formatMoney(outstandingBalance) : "Not available"}</span></div>
+                    <div><span className="text-slate-500">Status:</span> <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-semibold text-slate-900">Booking Information</div>
+                  <div className="mt-3 space-y-3 text-sm text-slate-700">
+                    <div><span className="text-slate-500">Area booked:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_area_id ? areaLookup[selectedBooking.selected_area_id] || "Selected area" : "Not specified"}</span></div>
+                    <div><span className="text-slate-500">Type of booking / function:</span> <span className="font-medium text-slate-900">Not specified</span></div>
                     <div><span className="text-slate-500">Guests:</span> <span className="font-medium text-slate-900">{formatGuestCount(selectedBooking)}</span></div>
-                    <div><span className="text-slate-500">Amount:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
+                    <div><span className="text-slate-500">Arrival time:</span> <span className="font-medium text-slate-900">Not specified</span></div>
+                    <div><span className="text-slate-500">Departure time:</span> <span className="font-medium text-slate-900">Not specified</span></div>
+                    <div><span className="text-slate-500">Special requirements:</span> <span className="font-medium text-slate-900">{selectedBooking.notes || "Not specified"}</span></div>
+                    <div><span className="text-slate-500">Additional services required:</span> <span className="font-medium text-slate-900">{additionalServiceNames.length > 0 ? additionalServiceNames.join(", ") : "Not specified"}</span></div>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-900">Payment</div>
-                  <div className="mt-3 space-y-2 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
-                    <div><span className="text-slate-500">Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatPaymentStatus(selectedBooking.payment_status)}</span></div>
-                    <div><span className="text-slate-500">Proof:</span> <span className="font-medium text-slate-900">{selectedPayment?.receipt_file_name || "Not uploaded"}</span></div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-900">Status</div>
-                  <div className="mt-3 space-y-2 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Booking:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBooking.booking_status)}`}>{formatBookingStatus(selectedBooking.booking_status)}</span></div>
-                    <div><span className="text-slate-500">Payment:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatPaymentStatus(selectedBooking.payment_status)}</span></div>
+                  <div className="text-sm font-semibold text-slate-900">Payment Information</div>
+                  <div className="mt-3 space-y-3 text-sm text-slate-700">
+                    <div><span className="text-slate-500">Total Amount:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
+                    <div><span className="text-slate-500">Discount Applied:</span> <span className="font-medium text-slate-900">Not available</span></div>
+                    <div><span className="text-slate-500">Deposit Paid:</span> <span className="font-medium text-slate-900">Not available</span></div>
+                    <div><span className="text-slate-500">Outstanding Balance:</span> <span className="font-medium text-slate-900">{outstandingBalance !== null ? formatMoney(outstandingBalance) : "Not available"}</span></div>
+                    <div><span className="text-slate-500">Payment Due Date:</span> <span className="font-medium text-slate-900">Not available</span></div>
+                    <div><span className="text-slate-500">Payment Received Date:</span> <span className="font-medium text-slate-900">Not available</span></div>
+                    <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
+                    <div><span className="text-slate-500">Payment Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-semibold text-slate-900">Notes</div>
+                <div className="text-sm font-semibold text-slate-900">Notes / Special Requirements</div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{selectedBooking.notes || "No extra notes."}</p>
               </div>
             </div>
