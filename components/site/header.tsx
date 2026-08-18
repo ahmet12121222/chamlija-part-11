@@ -199,7 +199,7 @@ export function SiteHeader() {
             <button
               type="button"
               onClick={() => setIsLanguageOpen((open) => !open)}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
+              className={`hidden h-10 w-10 items-center justify-center rounded-full border transition lg:inline-flex ${
                 transparentMode ? "border-white/25 text-white hover:bg-white/10" : "border-[#14251d]/15 text-[#14251d] hover:bg-[#f6f2ea]"
               }`}
               aria-label="Language selector"
