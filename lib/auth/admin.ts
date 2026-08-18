@@ -5,13 +5,13 @@ export const ADMIN_SESSION_COOKIE = "booking_admin_session";
 
 export function getSupabasePublicClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase public configuration for admin authentication.");
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase URL or public key configuration for admin authentication.");
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
