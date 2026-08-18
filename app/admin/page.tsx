@@ -199,7 +199,7 @@ export default async function AdminDashboardPage({
             </div>
 
             {/* Manual Payment Confirmation */}
-            {selectedBooking.payment_method === "cash_at_gate" && selectedBooking.payment_status !== "paid" && (
+            {selectedBooking.payment_method === "cash_at_gate" && !["paid", "confirmed"].includes(selectedBooking.payment_status ?? "") && (
               <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="text-sm font-semibold text-emerald-900">Confirm Payment Received</div>
                 <p className="mt-2 text-sm text-emerald-800">Did the customer pay cash at the gate? Click below to confirm payment received.</p>

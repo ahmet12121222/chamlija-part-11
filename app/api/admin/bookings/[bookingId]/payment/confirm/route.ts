@@ -35,8 +35,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
       return NextResponse.json({ error: "This booking does not use manual payment" }, { status: 400 });
     }
 
-    // Update booking payment status to paid
-    const { error: updateBookingError } = await supabaseAdmin.from("bookings").update({ payment_status: "paid" }).eq("id", bookingId);
+    // Update booking and payment status for a confirmed manual payment.
+    const { error: updateBookingError } = await supabaseAdmin
+      .from("bookings")
+      .update({
+        payment_status: "paid",
+        booking_status: "confirmed",
+      })
+      .eq("id", bookingId);
 
     if (updateBookingError) {
       return NextResponse.json({ error: updateBookingError.message }, { status: 500 });
