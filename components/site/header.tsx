@@ -208,7 +208,7 @@ export function SiteHeader() {
             </button>
 
             {isLanguageOpen && (
-              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#14251d]/35 p-3 backdrop-blur-[2px] sm:items-center" onClick={() => setIsLanguageOpen(false)}>
+              <div className="fixed inset-0 z-[60] hidden items-end justify-center bg-[#14251d]/35 p-3 backdrop-blur-[2px] sm:items-center lg:flex" onClick={() => setIsLanguageOpen(false)}>
                 <div
                   ref={languagePanelRef}
                   className="w-full max-w-[390px] overflow-hidden rounded-[1.5rem] border border-[#dfe8df] bg-[#f8f6f1] shadow-[0_24px_60px_rgba(20,37,29,0.18)]"
