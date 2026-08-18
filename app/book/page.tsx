@@ -148,8 +148,10 @@ export default function BookingPage() {
         selectedPaidActivityId,
         selectedTentAreaId,
         selectedPhotoShootId,
+        bookingDate: form.bookingDate || undefined,
+        creationDate: new Date().toISOString().split("T")[0],
       }),
-    [adults, children3Plus, childrenUnder3, selectedArea, equipmentQuantities, products, selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId],
+    [adults, children3Plus, childrenUnder3, selectedArea, equipmentQuantities, products, selectedPaidActivityId, selectedTentAreaId, selectedPhotoShootId, form.bookingDate],
   );
 
   const entranceFeeTotal = bookingPriceBreakdown.entranceFeeTotal;

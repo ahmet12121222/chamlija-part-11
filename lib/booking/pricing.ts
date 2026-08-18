@@ -1,6 +1,6 @@
 import type { ProductRecord } from "@/lib/products/types";
 import type { VisitorCounts } from "./types";
-import { calculateDiscountPercentage, calculateDiscountedTotal } from "@/lib/business/business-rules";
+import { getDiscountInfo } from "@/lib/business-rules/discounts";
 
 export const PRICING = {
   adult: 50,
@@ -25,10 +25,10 @@ export type BookingPriceBreakdown = {
   equipmentTotal: number;
   singleItemTotal: number;
   additionalTotal: number;
-  subtotal: number; // Before discount
-  discountPercentage: number; // 0-100
-  discountAmount: number; // Amount saved
-  total: number; // After discount (final amount to pay)
+  subtotal: number; // Total before discount
+  discountPercentage: number;
+  discountAmount: number;
+  total: number; // Total after discount
   lineItems: BookingPriceLineItem[];
 };
 
@@ -83,6 +83,8 @@ export function calculateBookingPriceBreakdown({
   selectedPaidActivityId,
   selectedTentAreaId,
   selectedPhotoShootId,
+  bookingDate,
+  creationDate,
 }: {
   adults: number;
   children3Plus: number;
@@ -93,6 +95,8 @@ export function calculateBookingPriceBreakdown({
   selectedPaidActivityId?: string | null;
   selectedTentAreaId?: string | null;
   selectedPhotoShootId?: string | null;
+  bookingDate?: string | null;
+  creationDate?: string | null;
 }): BookingPriceBreakdown {
   const adultTotal = adults * PRICING.adult;
   const child3PlusTotal = children3Plus * PRICING.child3Plus;
@@ -161,7 +165,10 @@ export function calculateBookingPriceBreakdown({
   });
 
   const additionalTotal = areaTotal + equipmentTotal + singleItemTotal;
-  const total = entranceFeeTotal + additionalTotal;
+  const subtotal = entranceFeeTotal + additionalTotal;
+
+  // Calculate discount based on booking date
+  const discount = getDiscountInfo(subtotal, bookingDate, creationDate);
 
   return {
     adultTotal,
@@ -172,7 +179,10 @@ export function calculateBookingPriceBreakdown({
     equipmentTotal,
     singleItemTotal,
     additionalTotal,
-    total,
+    subtotal,
+    discountPercentage: discount.discountPercentage,
+    discountAmount: discount.discountAmount,
+    total: discount.totalAfterDiscount,
     lineItems,
   };
 }

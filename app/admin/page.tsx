@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminAccess } from "@/lib/auth/admin";
+import { getDiscountInfo } from "@/lib/business-rules/discounts";
 
 function formatStatus(status: string | null | undefined) {
   return (status ?? "pending").replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
@@ -291,7 +292,7 @@ export default async function AdminDashboardPage({
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
     .from("bookings")
-    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, payment_method, selected_equipment_ids, notes, adults, children_3_plus, children_under_3")
+    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, payment_method, selected_equipment_ids, notes, adults, children_3_plus, children_under_3, created_at")
     .order("booking_date", { ascending: true })
     .order("booking_time", { ascending: true })
     .limit(200);
@@ -403,23 +404,49 @@ export default async function AdminDashboardPage({
   };
 
   const selectedBooking = items.find((booking) => booking.id === selectedBookingId) ?? null;
-  const pendingBankTransferBooking = selectedBooking ? isPendingBankTransferBooking(selectedBooking) : false;
-  const selectedPayment = selectedBooking
+  
+  // Calculate discount information for selected booking
+  const selectedBookingDiscount = selectedBooking && selectedBooking.created_at && selectedBooking.booking_date
+    ? getDiscountInfo(
+        selectedBooking.total_price || 0,
+        selectedBooking.booking_date,
+        new Date(selectedBooking.created_at).toISOString().split("T")[0]
+      )
+    : null;
+  
+  // Calculate subtotal by reversing the discount
+  const selectedBookingSubtotal = selectedBookingDiscount
+    ? selectedBookingDiscount.totalAfterDiscount === 0 && selectedBookingDiscount.discountPercentage === 0
+      ? selectedBooking?.total_price || 0
+      : selectedBookingDiscount.discountPercentage > 0
+        ? selectedBookingDiscount.discountAmount + selectedBookingDiscount.totalAfterDiscount
+        : selectedBooking?.total_price || 0
+    : selectedBooking?.total_price || 0;
+  
+  const selectedBookingWithDiscount = selectedBooking ? {
+    ...selectedBooking,
+    subtotal: selectedBookingSubtotal,
+    discount_percentage: selectedBookingDiscount?.discountPercentage || 0,
+    discount_amount: selectedBookingDiscount?.discountAmount || 0,
+  } : null;
+  
+  const pendingBankTransferBooking = selectedBookingWithDiscount ? isPendingBankTransferBooking(selectedBookingWithDiscount) : false;
+  const selectedPayment = selectedBookingWithDiscount
     ? (
         await supabaseAdmin
           .from("payments")
           .select("id, amount, refund_amount, status, provider, payment_method, receipt_url, receipt_file_name, review_status, reviewed_at, review_note")
-          .eq("booking_id", selectedBooking.id)
+          .eq("booking_id", selectedBookingWithDiscount.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle()
       )?.data ?? null
     : null;
-  const refundAmountDue = Number(selectedPayment?.refund_amount ?? selectedPayment?.amount ?? selectedBooking?.total_price ?? 0);
+  const refundAmountDue = Number(selectedPayment?.refund_amount ?? selectedPayment?.amount ?? selectedBookingWithDiscount?.total_price ?? 0);
   const paidAmount = Number(selectedPayment?.amount ?? 0);
-  const outstandingBalance = selectedBooking && paidAmount > 0 ? Math.max(Number(selectedBooking.total_price ?? 0) - paidAmount, 0) : null;
-  const additionalServiceNames = selectedBooking
-    ? (Array.isArray(selectedBooking.selected_equipment_ids) ? selectedBooking.selected_equipment_ids : [])
+  const outstandingBalance = selectedBookingWithDiscount && paidAmount > 0 ? Math.max(Number(selectedBookingWithDiscount.total_price ?? 0) - paidAmount, 0) : null;
+  const additionalServiceNames = selectedBookingWithDiscount
+    ? (Array.isArray(selectedBookingWithDiscount.selected_equipment_ids) ? selectedBookingWithDiscount.selected_equipment_ids : [])
         .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
         .map((value) => productLookup[value] || "Service")
         .filter(Boolean)
@@ -662,13 +689,13 @@ export default async function AdminDashboardPage({
         </div>
       </div>
 
-      {selectedBooking && (
+      {selectedBookingWithDiscount && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-3 sm:items-center sm:p-6">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.1)]">
             <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Booking details</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{selectedBooking.customer_name || "Customer booking"}</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{selectedBookingWithDiscount.customer_name || "Customer booking"}</h2>
               </div>
               <a
                 href={buildAdminUrl({ filter: activeFilter, search: searchQuery, date: selectedDate, bookingStatus: selectedBookingStatus, paymentStatus: selectedPaymentStatus, paymentMethod: selectedPaymentMethod })}
@@ -681,18 +708,18 @@ export default async function AdminDashboardPage({
             <div className="space-y-5 p-5 sm:p-6">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBooking.booking_status)}`}>
-                    {formatBookingStatus(selectedBooking.booking_status).toUpperCase()}
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBookingWithDiscount.booking_status)}`}>
+                    {formatBookingStatus(selectedBookingWithDiscount.booking_status).toUpperCase()}
                   </span>
                   <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                    {formatPaymentMethod(selectedBooking.payment_method)}
+                    {formatPaymentMethod(selectedBookingWithDiscount.payment_method)}
                   </span>
-                  <span className="ml-auto text-base font-black tracking-tight text-slate-900">{formatMoney(selectedBooking.total_price)}</span>
+                  <span className="ml-auto text-base font-black tracking-tight text-slate-900">{formatMoney(selectedBookingWithDiscount.total_price)}</span>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
-                  <div><span className="text-slate-500">Booking Status:</span> <span className="font-medium text-slate-900">{formatBookingStatus(selectedBooking.booking_status)}</span></div>
-                  <div><span className="text-slate-500">Payment Status:</span> <span className="font-medium text-slate-900">{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
-                  <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
+                  <div><span className="text-slate-500">Booking Status:</span> <span className="font-medium text-slate-900">{formatBookingStatus(selectedBookingWithDiscount.booking_status)}</span></div>
+                  <div><span className="text-slate-500">Payment Status:</span> <span className="font-medium text-slate-900">{formatDisplayStatusLabel(selectedBookingWithDiscount.payment_status)}</span></div>
+                  <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBookingWithDiscount.payment_method)}</span></div>
                 </div>
               </div>
 
@@ -700,20 +727,20 @@ export default async function AdminDashboardPage({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-semibold text-slate-900">Booking Summary</div>
                   <div className="mt-3 space-y-3 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Reference:</span> <span className="font-medium text-slate-900">{selectedBooking.reservation_code || formatShortReference(selectedBooking.id)}</span></div>
-                    <div><span className="text-slate-500">Customer:</span> <span className="font-medium text-slate-900">{selectedBooking.customer_name || "Unknown"}</span></div>
-                    <div><span className="text-slate-500">Date:</span> <span className="font-medium text-slate-900">{formatDisplayDate(selectedBooking.booking_date)}</span></div>
-                    <div><span className="text-slate-500">Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBooking.booking_status)}`}>{formatBookingStatus(selectedBooking.booking_status)}</span></div>
+                    <div><span className="text-slate-500">Reference:</span> <span className="font-medium text-slate-900">{selectedBookingWithDiscount.reservation_code || formatShortReference(selectedBookingWithDiscount.id)}</span></div>
+                    <div><span className="text-slate-500">Customer:</span> <span className="font-medium text-slate-900">{selectedBookingWithDiscount.customer_name || "Unknown"}</span></div>
+                    <div><span className="text-slate-500">Date:</span> <span className="font-medium text-slate-900">{formatDisplayDate(selectedBookingWithDiscount.booking_date)}</span></div>
+                    <div><span className="text-slate-500">Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBookingWithDiscount.booking_status)}`}>{formatBookingStatus(selectedBookingWithDiscount.booking_status)}</span></div>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-semibold text-slate-900">Payment Summary</div>
                   <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                    <div><span className="text-slate-500">Total:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
+                    <div><span className="text-slate-500">Total:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBookingWithDiscount.total_price)}</span></div>
                     <div><span className="text-slate-500">Paid:</span> <span className="font-medium text-slate-900">{selectedPayment?.amount ? formatMoney(Number(selectedPayment.amount)) : "Not available"}</span></div>
                     <div><span className="text-slate-500">Outstanding:</span> <span className="font-medium text-slate-900">{outstandingBalance !== null ? formatMoney(outstandingBalance) : "Not available"}</span></div>
-                    <div><span className="text-slate-500">Status:</span> <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
+                    <div><span className="text-slate-500">Status:</span> <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBookingWithDiscount.payment_status)}`}>{formatDisplayStatusLabel(selectedBookingWithDiscount.payment_status)}</span></div>
                   </div>
                 </div>
               </div>
@@ -722,12 +749,12 @@ export default async function AdminDashboardPage({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-semibold text-slate-900">Booking Information</div>
                   <div className="mt-3 space-y-3 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Area booked:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_area_id ? areaLookup[selectedBooking.selected_area_id] || "Selected area" : "Not specified"}</span></div>
+                    <div><span className="text-slate-500">Area booked:</span> <span className="font-medium text-slate-900">{selectedBookingWithDiscount.selected_area_id ? areaLookup[selectedBookingWithDiscount.selected_area_id] || "Selected area" : "Not specified"}</span></div>
                     <div><span className="text-slate-500">Type of booking / function:</span> <span className="font-medium text-slate-900">Not specified</span></div>
-                    <div><span className="text-slate-500">Guests:</span> <span className="font-medium text-slate-900">{formatGuestCount(selectedBooking)}</span></div>
+                    <div><span className="text-slate-500">Guests:</span> <span className="font-medium text-slate-900">{formatGuestCount(selectedBookingWithDiscount)}</span></div>
                     <div><span className="text-slate-500">Arrival time:</span> <span className="font-medium text-slate-900">Not specified</span></div>
                     <div><span className="text-slate-500">Departure time:</span> <span className="font-medium text-slate-900">Not specified</span></div>
-                    <div><span className="text-slate-500">Special requirements:</span> <span className="font-medium text-slate-900">{selectedBooking.notes || "Not specified"}</span></div>
+                    <div><span className="text-slate-500">Special requirements:</span> <span className="font-medium text-slate-900">{selectedBookingWithDiscount.notes || "Not specified"}</span></div>
                     <div><span className="text-slate-500">Additional services required:</span> <span className="font-medium text-slate-900">{additionalServiceNames.length > 0 ? additionalServiceNames.join(", ") : "Not specified"}</span></div>
                   </div>
                 </div>
@@ -735,32 +762,34 @@ export default async function AdminDashboardPage({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-semibold text-slate-900">Payment Information</div>
                   <div className="mt-3 space-y-3 text-sm text-slate-700">
-                    <div><span className="text-slate-500">Total Amount:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
-                    <div><span className="text-slate-500">Discount Applied:</span> <span className="font-medium text-slate-900">Not available</span></div>
+                    <div><span className="text-slate-500">Subtotal (before discount):</span> <span className="font-medium text-slate-900">{formatMoney(selectedBookingWithDiscount.subtotal || selectedBookingWithDiscount.total_price)}</span></div>
+                    <div><span className="text-slate-500">Discount Percentage:</span> <span className="font-medium text-slate-900">{selectedBookingWithDiscount.discount_percentage ? `${selectedBookingWithDiscount.discount_percentage}%` : "0%"}</span></div>
+                    <div><span className="text-slate-500">Discount Amount:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBookingWithDiscount.discount_amount || 0)}</span></div>
+                    <div><span className="text-slate-500">Total After Discount:</span> <span className="font-medium text-slate-900 font-bold">{formatMoney(selectedBookingWithDiscount.total_price)}</span></div>
                     <div><span className="text-slate-500">Deposit Paid:</span> <span className="font-medium text-slate-900">Not available</span></div>
                     <div><span className="text-slate-500">Outstanding Balance:</span> <span className="font-medium text-slate-900">{outstandingBalance !== null ? formatMoney(outstandingBalance) : "Not available"}</span></div>
                     <div><span className="text-slate-500">Payment Due Date:</span> <span className="font-medium text-slate-900">Not available</span></div>
                     <div><span className="text-slate-500">Payment Received Date:</span> <span className="font-medium text-slate-900">Not available</span></div>
-                    <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
-                    <div><span className="text-slate-500">Payment Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBooking.payment_status)}`}>{formatDisplayStatusLabel(selectedBooking.payment_status)}</span></div>
+                    <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBookingWithDiscount.payment_method)}</span></div>
+                    <div><span className="text-slate-500">Payment Status:</span> <span className={`ml-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(selectedBookingWithDiscount.payment_status)}`}>{formatDisplayStatusLabel(selectedBookingWithDiscount.payment_status)}</span></div>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-semibold text-slate-900">Notes / Special Requirements</div>
-                <p className="mt-3 text-sm leading-6 text-slate-700">{selectedBooking.notes || "No extra notes."}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{selectedBookingWithDiscount.notes || "No extra notes."}</p>
               </div>
             </div>
 
             <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                {selectedBooking.payment_method === "cash_at_gate" && !["paid", "confirmed"].includes(selectedBooking.payment_status ?? "") && (
+                {selectedBookingWithDiscount.payment_method === "cash_at_gate" && !["paid", "confirmed"].includes(selectedBookingWithDiscount.payment_status ?? "") && (
                   <form
-                    action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST"
+                    action={`/api/admin/bookings/${selectedBookingWithDiscount.id}/payment/confirm`} method="POST"
                     data-review-form="true"
                     data-review-action="approve"
-                    data-booking-id={selectedBooking.id}
+                    data-booking-id={selectedBookingWithDiscount.id}
                   >
                     <button type="submit" className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
                       Confirm Payment
@@ -772,14 +801,14 @@ export default async function AdminDashboardPage({
                   <button
                     type="button"
                     data-confirm-payment-button="true"
-                    data-booking-id={selectedBooking.id}
+                    data-booking-id={selectedBookingWithDiscount.id}
                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
                     Confirm Payment
                   </button>
                 )}
 
-                <form action={`/api/admin/bookings/${selectedBooking.id}/cancel`} method="POST" className="flex items-center gap-2">
+                <form action={`/api/admin/bookings/${selectedBookingWithDiscount.id}/cancel`} method="POST" className="flex items-center gap-2">
                   <button
                     type="button"
                     data-cancel-booking-button="true"
@@ -805,7 +834,7 @@ export default async function AdminDashboardPage({
             <script dangerouslySetInnerHTML={{
               __html: `
                 (() => {
-                  const totalAmount = Number(${Number(selectedBooking.total_price ?? 0)});
+                  const totalAmount = Number(${Number(selectedBookingWithDiscount?.total_price ?? 0)});
                   const refundModeInputs = document.querySelectorAll('input[name="refundMode"]');
                   const refundAmountInput = document.getElementById('refundAmount');
                   const refundAmountRequired = document.getElementById('refundAmountRequired');

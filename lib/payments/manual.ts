@@ -190,7 +190,7 @@ export async function getBookingPaymentSummary(bookingId: string): Promise<Booki
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(
-      "id, total_price, booking_status, payment_status, payment_method, customer_name, email, phone_number, booking_date, booking_time, reservation_code, selected_area_id, selected_equipment_ids, selected_paid_activity_id, selected_tent_area_id, selected_photo_shoot_id, adults, children_3_plus, children_under_3",
+      "id, total_price, booking_status, payment_status, payment_method, customer_name, email, phone_number, booking_date, booking_time, reservation_code, selected_area_id, selected_equipment_ids, selected_paid_activity_id, selected_tent_area_id, selected_photo_shoot_id, adults, children_3_plus, children_under_3, created_at",
     )
     .eq("id", bookingId)
     .maybeSingle();
@@ -240,6 +240,10 @@ export async function getBookingPaymentSummary(bookingId: string): Promise<Booki
   const adults = Number(data.adults ?? 0);
   const children3Plus = Number(data.children_3_plus ?? 0);
   const childrenUnder3 = Number(data.children_under_3 ?? 0);
+  
+  // Extract creation date for discount calculation
+  const creationDate = data.created_at ? new Date(data.created_at).toISOString().split("T")[0] : undefined;
+  
   const breakdown = calculateBookingPriceBreakdown({
     adults,
     children3Plus,
@@ -250,6 +254,8 @@ export async function getBookingPaymentSummary(bookingId: string): Promise<Booki
     selectedPaidActivityId,
     selectedTentAreaId,
     selectedPhotoShootId,
+    bookingDate: data.booking_date,
+    creationDate,
   });
 
   const canonicalTotal = breakdown.total;

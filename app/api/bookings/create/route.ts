@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { isValidBookingTime } from "@/lib/booking/hours";
 import { calculateBookingPriceBreakdown, parseSelectedEquipmentQuantities } from "@/lib/booking/pricing";
+import { validateAreaCapacity, getAreaCapacity } from "@/lib/business-rules/areas";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 function parseNonNegativeInteger(value: unknown): number {
@@ -92,8 +93,10 @@ export async function POST(request: Request) {
       };
       area = selectedArea;
 
-      if (selectedArea.capacity !== null && selectedArea.capacity !== undefined && adults + children3Plus + childrenUnder3 > Number(selectedArea.capacity)) {
-        return NextResponse.json({ error: "The selected picnic area cannot accommodate your party size." }, { status: 400 });
+      // Use centralized capacity validation
+      const capacityCheck = validateAreaCapacity(selectedArea.name, adults, children3Plus, childrenUnder3);
+      if (!capacityCheck.valid) {
+        return NextResponse.json({ error: capacityCheck.message || "The selected area cannot accommodate your party size." }, { status: 400 });
       }
     }
 
@@ -164,6 +167,8 @@ export async function POST(request: Request) {
       selectedPaidActivityId,
       selectedTentAreaId,
       selectedPhotoShootId,
+      bookingDate,
+      creationDate: new Date().toISOString().split("T")[0],
     });
 
     const finalTotal = finalBreakdown.total;
