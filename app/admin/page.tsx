@@ -363,11 +363,12 @@ export default async function AdminDashboardPage({
                     type="button"
                     data-confirm-payment-button="true"
                     data-booking-id={selectedBooking.id}
-                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
                     Confirm Payment
                   </button>
                 </div>
+                <div id="payment-confirmation-message" hidden className="mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-700"></div>
               </div>
             )}
 
@@ -564,24 +565,54 @@ export default async function AdminDashboardPage({
                         return;
                       }
 
+                      const paymentNotice = document.getElementById('payment-confirmation-message');
+                      const originalText = button.textContent || 'Confirm Payment';
+
+                      button.disabled = true;
+                      button.textContent = 'Confirming payment...';
+
+                      if (paymentNotice) {
+                        paymentNotice.hidden = true;
+                        paymentNotice.textContent = '';
+                        paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-700';
+                      }
+
+                      const requestUrl = '/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review';
+                      console.log('Confirm payment request URL:', requestUrl);
+
                       try {
                         const formData = new FormData();
                         formData.append('action', 'approve');
 
-                        const response = await fetch('/api/admin/bookings/' + encodeURIComponent(bookingId) + '/payment/review', {
+                        console.log('Confirm payment request method: POST');
+                        console.log('Confirm payment request body:', { action: 'approve' });
+
+                        const response = await fetch(requestUrl, {
                           method: 'POST',
                           body: formData,
                         });
 
-                        const result = await response.json().catch(() => ({}));
+                        const responseText = await response.text();
+                        let responseJson = {};
+                        try {
+                          responseJson = responseText ? JSON.parse(responseText) : {};
+                        } catch {
+                          responseJson = {};
+                        }
+
+                        console.log('Confirm payment response status:', response.status);
+                        console.log('Confirm payment response JSON:', responseJson);
+
                         if (!response.ok) {
-                          const errorMessage = result?.error || 'Payment confirmation failed.';
-                          const paymentNotice = document.getElementById('payment-confirmation-message');
+                          const errorMessage = responseJson?.error || responseJson?.message || 'Payment confirmation failed.';
+                          const messageText = 'Payment confirmation failed: ' + errorMessage;
+
                           if (paymentNotice) {
-                            paymentNotice.textContent = 'Payment confirmation failed: ' + errorMessage;
+                            paymentNotice.textContent = messageText;
                             paymentNotice.hidden = false;
+                            paymentNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
                           } else {
-                            alert('Payment confirmation failed: ' + errorMessage);
+                            alert(messageText);
                           }
                           return;
                         }
@@ -597,25 +628,33 @@ export default async function AdminDashboardPage({
 
                         const paymentPanel = document.querySelector('[data-confirm-payment-panel]');
                         if (paymentPanel) {
-                          paymentPanel.remove();
+                          paymentPanel.classList.add('border-emerald-300');
                         }
 
-                        const message = document.getElementById('payment-confirmation-message');
-                        if (message) {
-                          message.textContent = 'Payment confirmed successfully';
-                          message.hidden = false;
+                        if (paymentNotice) {
+                          paymentNotice.textContent = 'Payment confirmed successfully.';
+                          paymentNotice.hidden = false;
+                          paymentNotice.className = 'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700';
                         }
 
-                        window.location.reload();
+                        const successText = 'Payment confirmed successfully.';
+                        console.log(successText);
+                        button.textContent = successText;
+                        button.disabled = true;
                       } catch (error) {
                         console.error('Confirm payment failed:', error);
-                        const paymentNotice = document.getElementById('payment-confirmation-message');
+                        const messageText = 'Payment confirmation failed: Network or server error.';
+
                         if (paymentNotice) {
-                          paymentNotice.textContent = 'Payment confirmation failed: ' + (error instanceof Error ? error.message : 'Unknown error');
+                          paymentNotice.textContent = messageText;
                           paymentNotice.hidden = false;
+                          paymentNotice.className = 'mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700';
                         } else {
-                          alert('Payment confirmation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          alert(messageText);
                         }
+
+                        button.textContent = originalText;
+                        button.disabled = false;
                       }
                     });
                   });
