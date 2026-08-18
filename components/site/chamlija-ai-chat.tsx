@@ -66,7 +66,7 @@ export function ChamlijaAIChat() {
     setIsOpen(false);
   }, [pathname]);
 
-  const sendMessage = (value?: string) => {
+  const sendMessage = async (value?: string) => {
     const trimmed = (value ?? input).trim();
 
     if (!trimmed) {
@@ -86,60 +86,94 @@ export function ChamlijaAIChat() {
     setInput("");
     setIsTyping(true);
 
-    window.setTimeout(() => {
-      if (plannerOpen && plannerResult && !shouldOpenPlanner) {
-        const followUpHandled = handlePlannerFollowUp(trimmed);
-        if (followUpHandled) {
-          setMessages((current) => [...current, {
-            id: `ai-${Date.now() + 1}`,
-            sender: "ai",
-            text: language === "tr" ? "Planımı güncelledim. İsterseniz tercihleri de değiştirebiliriz." : "I’ve updated the plan. I can keep refining it for you.",
-          }]);
-          setIsTyping(false);
-          return;
-        }
-      }
-
-      if (shouldOpenPlanner) {
-        setPlannerOpen(true);
-        const plannerMessage: ChatMessage = {
+    if (plannerOpen && plannerResult && !shouldOpenPlanner) {
+      const followUpHandled = handlePlannerFollowUp(trimmed);
+      if (followUpHandled) {
+        setMessages((current) => [...current, {
           id: `ai-${Date.now() + 1}`,
           sender: "ai",
-          text: language === "tr" ? "Harika! Gününüzü adım adım planlayalım. Önce kiminle geldiğinizi seçelim." : "Perfect! Let’s build your day step by step. First, tell me who you’re visiting with.",
-        };
-        setMessages((current) => [...current, plannerMessage]);
+          text: language === "tr" ? "Planımı güncelledim. İsterseniz tercihleri de değiştirebiliriz." : "I’ve updated the plan. I can keep refining it for you.",
+        }]);
         setIsTyping(false);
         return;
       }
+    }
 
-      const response = buildChamlijaAIResponse(trimmed);
-      const reply: ChatMessage = {
+    if (shouldOpenPlanner) {
+      setPlannerOpen(true);
+      const plannerMessage: ChatMessage = {
         id: `ai-${Date.now() + 1}`,
         sender: "ai",
-        response,
+        text: language === "tr" ? "Harika! Gününüzü adım adım planlayalım. Önce kiminle geldiğinizi seçelim." : "Perfect! Let’s build your day step by step. First, tell me who you’re visiting with.",
       };
+      setMessages((current) => [...current, plannerMessage]);
+      setIsTyping(false);
+      return;
+    }
 
-      if (response.planner?.mode === "plan-my-day") {
-        setPlannerOpen(true);
-      }
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed }),
+      });
 
-      if (response.cta) {
-        if (response.cta.action === "reservation") {
+      const data = await response.json().catch(() => ({}));
+      const text = typeof data?.text === "string" ? data.text : "";
+
+      if (text) {
+        const reply: ChatMessage = {
+          id: `ai-${Date.now() + 1}`,
+          sender: "ai",
+          text,
+        };
+
+        const fallback = Boolean(data?.fallback);
+        const routeAction = !fallback && /reservation|book|reserve|rezervasyon|book a visit|plan my day|plan my visit/i.test(trimmed);
+
+        if (routeAction) {
           reply.action = {
             kind: "route",
-            href: response.cta.href ?? BOOKING_ROUTE,
-            label: response.cta.label,
+            href: BOOKING_ROUTE,
+            label: language === "tr" ? "Rezervasyon Yap" : "Reserve Now",
           };
-        } else if (response.cta.action === "location") {
-          reply.action = { kind: "link", href: response.cta.href ?? CHAMLIJA_MAPS_URL, label: response.cta.label };
-        } else if (response.cta.action === "instagram") {
-          reply.action = { kind: "link", href: response.cta.href ?? "https://www.instagram.com/buyukchamlija/", label: response.cta.label };
         }
-      }
 
-      setMessages((current) => [...current, reply]);
-      setIsTyping(false);
-    }, 800);
+        setMessages((current) => [...current, reply]);
+        setIsTyping(false);
+        return;
+      }
+    } catch (error) {
+      console.error("AI request failed", error);
+    }
+
+    const response = buildChamlijaAIResponse(trimmed);
+    const reply: ChatMessage = {
+      id: `ai-${Date.now() + 1}`,
+      sender: "ai",
+      response,
+    };
+
+    if (response.planner?.mode === "plan-my-day") {
+      setPlannerOpen(true);
+    }
+
+    if (response.cta) {
+      if (response.cta.action === "reservation") {
+        reply.action = {
+          kind: "route",
+          href: response.cta.href ?? BOOKING_ROUTE,
+          label: response.cta.label,
+        };
+      } else if (response.cta.action === "location") {
+        reply.action = { kind: "link", href: response.cta.href ?? CHAMLIJA_MAPS_URL, label: response.cta.label };
+      } else if (response.cta.action === "instagram") {
+        reply.action = { kind: "link", href: response.cta.href ?? "https://www.instagram.com/buyukchamlija/", label: response.cta.label };
+      }
+    }
+
+    setMessages((current) => [...current, reply]);
+    setIsTyping(false);
   };
 
   const currentPlannerStepIndex = plannerStepOrder.indexOf(plannerState.step);
@@ -782,16 +816,28 @@ export function ChamlijaAIChat() {
               {/* Input Area */}
               <div className="mt-3 shrink-0 rounded-2xl border border-[#e2ebdf] bg-white/80 p-2 shadow-[0_10px_24px_rgba(18,33,28,0.05)]">
                 <div className="mb-2 flex flex-wrap gap-2">
-                  {starterSuggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => sendMessage(suggestion.replace(/^[^\w\s]+/u, ""))}
-                      className="rounded-full border border-[#d7e7d8] bg-gradient-to-r from-white to-[#f5faf4] px-2.5 py-1.5 text-[11px] font-medium text-[#2b3f36] transition-transform hover:-translate-y-0.5 hover:border-[#bfd6c4]"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+                  {starterSuggestions.map((suggestion) => {
+                    const isReservationQuickAction = suggestion.toLowerCase().includes("reservation");
+
+                    return (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => {
+                          if (isReservationQuickAction) {
+                            setIsOpen(false);
+                            router.push(BOOKING_ROUTE);
+                            return;
+                          }
+
+                          sendMessage(suggestion.replace(/^[^\w\s]+/u, ""));
+                        }}
+                        className="rounded-full border border-[#d7e7d8] bg-gradient-to-r from-white to-[#f5faf4] px-2.5 py-1.5 text-[11px] font-medium text-[#2b3f36] transition-transform hover:-translate-y-0.5 hover:border-[#bfd6c4]"
+                      >
+                        {suggestion}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex items-center gap-2">

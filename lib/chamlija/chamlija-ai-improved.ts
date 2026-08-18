@@ -5,6 +5,12 @@
  */
 
 import { formatCurrency } from "@/lib/booking/pricing";
+import {
+  VERIFIED_CHAMLIJA_FACTS,
+  getVerifiedActivityExamples,
+  getVerifiedActivityList,
+  getVerifiedNoDataResponse,
+} from "@/lib/chamlija/verified-facts";
 
 const BOOKING_ROUTE = "/book";
 
@@ -815,21 +821,13 @@ export function generateActivitiesResponse(): ChatResponse {
     sections: [
       {
         emoji: "🌿",
-        title: "Chamlija Aktiviteleri",
-        content: [
-          { label: "🐪 Hayvan İzleme", value: "Ücretsiz" },
-          { label: "🚲 Bisiklet Sürme", value: "Ücretsiz (Kendi bisikletinizi getirin)" },
-          { label: "🌳 Yellow Wood Play Park", value: "Ücretsiz" },
-          { label: "🏏 Kriket", value: "Ücretsiz (Kendi ekipmanınızı getirin)" },
-          { label: "🏀 Basketbol", value: "Ücretsiz (Kendi ekipmanınızı getirin)" },
-          { label: "🏐 Beach Volleyball", value: "Ücretsiz (Kendi ekipmanınızı getirin)" },
-          { label: "⛳ Mini Golf", value: "Ücretsiz (Kendi ekipmanınızı getirin)" },
-          { label: "🏰 Jumping Castle", value: "Ücretsiz" },
-          { label: "🥕 Hayvan Besleme", value: "ZAR 30" },
-          { label: "🚜 OX Wagon Tour", value: "ZAR 60 yetişkin / ZAR 50 çocuk" }
-        ]
-      }
-    ]
+        title: "Verified Chamlija Activities",
+        content: getVerifiedActivityList().map((activity) => {
+          const [label, value] = activity.includes("(") ? activity.split(" (") : [activity, "Verified"];
+          return { label: label, value: value.replace(/\)$/, "") };
+        }),
+      },
+    ],
   };
 }
 
@@ -1109,6 +1107,39 @@ export function generateFacilityCheckResponse(input: string): ChatResponse {
   const isTurkish = language === "tr";
   const isEnglish = language === "en";
 
+  const unsupportedFacilityMatches = [
+    "horse riding",
+    "horseback",
+    "archery",
+    "zip line",
+    "zipline",
+    "spa",
+    "pool",
+    "waterslide",
+    "kayaking",
+    "quad biking",
+    "boat trip",
+    "mini train",
+    "tennis court",
+  ];
+
+  const unsupportedMatch = unsupportedFacilityMatches.find((term) => normalized.includes(term));
+  if (unsupportedMatch) {
+    const message = `At the moment, ${unsupportedMatch} is not one of the activities we offer at Chamlija. We currently offer verified options such as ${getVerifiedActivityExamples()}`;
+    return {
+      type: "text",
+      sections: [{
+        emoji: "ℹ️",
+        title: isTurkish ? "Doğrulanmış bilgi" : "Verified information",
+        content: [
+          isTurkish ? "Bu seçenek şu anda Chamlija'da doğrulanmış bir hizmet olarak mevcut değil." : "This option is not currently a verified Chamlija offering.",
+          message,
+          getVerifiedNoDataResponse(input),
+        ],
+      }],
+    };
+  }
+
   if (containsAny(normalized, ["otopark", "parking", "car park", "free parking", "park", "araç park"] )) {
     return {
       type: "text",
@@ -1311,11 +1342,48 @@ export function generateAvailabilityResponse(input: string): ChatResponse {
 }
 
 export function buildChamlijaAIResponse(input: string): ChatResponse {
+  const normalized = normalize(input);
   const intent = detectIntent(input);
   const counts = {
     adults: parseNumbers(normalize(input)).find((value) => value > 0) ?? undefined,
     children: parseNumbers(normalize(input)).slice(1).find((value) => value >= 0) ?? undefined,
   };
+
+  const knownActivityHints = [
+    "animal viewing",
+    "yellow wood",
+    "play park",
+    "bike riding",
+    "basketball",
+    "cricket",
+    "beach volleyball",
+    "mini golf",
+    "jumping castle",
+    "nature",
+    "animal feeding",
+    "ox wagon",
+    "braai",
+    "ottoman",
+    "grass area",
+    "parking",
+    "location",
+    "opening hours",
+  ];
+
+  const asksAboutService = /(do you have|is there|available|offer|provide|have .*service|have .*activity)/i.test(input);
+  const isUnknownServiceRequest = asksAboutService && !knownActivityHints.some((hint) => normalized.includes(hint));
+
+  if (isUnknownServiceRequest) {
+    const verifiedMessage = `I don't currently have verified information about that at Chamlija. We currently offer verified options such as ${getVerifiedActivityExamples()}.`;
+    return {
+      type: "text",
+      sections: [{
+        emoji: "ℹ️",
+        title: "Verified Chamlija information",
+        content: [verifiedMessage, getVerifiedNoDataResponse(input)],
+      }],
+    };
+  }
 
   const hasBudgetSignals = containsAny(normalize(input), ["cheap", "affordable", "budget", "low cost", "don't want to spend much", "not spend much", "free", "less than", "under", "cheap", "ucuz", "bütçe", "düşük"]);
   const hasFamilySignals = containsAny(normalize(input), ["family", "children", "kids", "aile", "cocuk", "çocuk", "with kids"]);
