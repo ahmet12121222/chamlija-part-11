@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
 
     try {
       const geminiResponse = await fetch(geminiUrl, {
@@ -68,16 +68,11 @@ export async function POST(request: Request) {
       const payload = await geminiResponse.json().catch(() => ({}));
 
       if (!geminiResponse.ok) {
-        const status = geminiResponse.status;
-        const googleError = payload?.error ?? payload ?? {};
-        const googleMessage = typeof googleError?.message === "string" ? googleError.message : "Gemini request failed";
-        const googleStatus = googleError?.status ?? "unknown";
-        const googleCode = googleError?.code ?? "unknown";
-
+        const fallbackResponse = buildChamlijaAIResponse(message);
         return NextResponse.json({
-          text: `Gemini HTTP ${status}: ${googleMessage} | status: ${googleStatus} | code: ${googleCode}`,
+          text: formatFallbackResponse(fallbackResponse),
           fallback: true,
-          source: "gemini-error",
+          source: "fallback",
         });
       }
 
@@ -93,7 +88,6 @@ export async function POST(request: Request) {
           text: formatFallbackResponse(fallbackResponse),
           fallback: true,
           source: "fallback",
-          debug: { reason: "gemini_empty_response" },
         });
       }
 
@@ -101,23 +95,13 @@ export async function POST(request: Request) {
         text: generatedText,
         fallback: false,
         source: "gemini",
-        debug: { reason: "gemini_ok" },
       });
     } catch (error) {
-      const messageText = error instanceof Error ? error.message : "Gemini request failed";
-      console.error("Gemini request failed", {
-        status: null,
-        message: messageText,
-        errorStatus: null,
-        code: null,
-      });
-
       const fallbackResponse = buildChamlijaAIResponse(message);
       return NextResponse.json({
         text: formatFallbackResponse(fallbackResponse),
         fallback: true,
         source: "fallback",
-        debug: { reason: "gemini_exception", message: messageText },
       });
     }
   } catch (error) {
