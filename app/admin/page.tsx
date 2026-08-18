@@ -8,7 +8,11 @@ function formatStatus(status: string | null | undefined) {
 
 function formatMoney(value: number | null | undefined) {
   const numeric = Number(value ?? 0);
-  return `R${Number.isFinite(numeric) ? numeric.toFixed(2) : "0.00"}`;
+  const safeValue = Number.isFinite(numeric) ? numeric : 0;
+  return `R ${safeValue.toLocaleString("en-ZA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function normalizePaymentMethod(value: string | null | undefined) {
@@ -21,25 +25,33 @@ function formatPaymentMethod(value: string | null | undefined) {
     return "Not selected";
   }
 
-  if (normalized.includes("ikhokha") || normalized.includes("ikhokha")) {
+  if (normalized.includes("ikhokha")) {
     return "iKhokha";
   }
 
-  if (
-    normalized === "bank_transfer" ||
-    normalized === "banktransfer" ||
-    normalized === "manual" ||
-    normalized === "manual_payment" ||
-    normalized === "manual_bank_transfer" ||
-    normalized === "manual_bank_payment" ||
-    normalized === "bank_transfer_manual" ||
-    normalized === "bank_transfer_manual_payment" ||
-    normalized === "bank_transfer_payment"
-  ) {
+  if (normalized.includes("bank")) {
     return "Bank Transfer";
   }
 
-  return normalized.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+  if (normalized.includes("manual") || normalized.includes("cash") || normalized.includes("gate")) {
+    if (normalized.includes("cash") || normalized.includes("gate")) {
+      return "Cash at Gate";
+    }
+    return "Manual Payment";
+  }
+
+  return normalized
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function formatGuestCount(booking: { adults?: number | null; children_3_plus?: number | null; children_under_3?: number | null }) {
+  const adults = Number(booking.adults ?? 0);
+  const children3Plus = Number(booking.children_3_plus ?? 0);
+  const childrenUnder3 = Number(booking.children_under_3 ?? 0);
+  const total = adults + children3Plus + childrenUnder3;
+
+  return `${total} guest${total === 1 ? "" : "s"}`;
 }
 
 function formatBookingStatus(status: string | null | undefined) {
@@ -128,9 +140,9 @@ function formatDisplayDate(value: string | null | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-ZA", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   }).format(date);
 }
@@ -261,7 +273,7 @@ export default async function AdminDashboardPage({
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
     .from("bookings")
-    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, payment_method, selected_equipment_ids, notes")
+    .select("id, reservation_code, customer_name, email, phone_number, booking_date, booking_time, selected_area_id, total_price, booking_status, payment_status, payment_method, selected_equipment_ids, notes, adults, children_3_plus, children_under_3")
     .order("booking_date", { ascending: true })
     .order("booking_time", { ascending: true })
     .limit(200);
@@ -279,6 +291,18 @@ export default async function AdminDashboardPage({
   }
 
   const items = bookings ?? [];
+  const areaIds = [...new Set(items.map((booking) => booking.selected_area_id).filter((value): value is string => typeof value === "string" && value.trim().length > 0))];
+  const areaLookup = areaIds.length
+    ? Object.fromEntries(
+        (
+          await supabaseAdmin
+            .from("products")
+            .select("id, name")
+            .in("id", areaIds)
+        )?.data?.map((area) => [area.id, area.name]) ?? []
+      )
+    : {};
+
   const filteredItems = items.filter((booking) => {
     const normalizedMethod = normalizePaymentMethod(booking.payment_method);
     const normalizedBookingStatus = String(booking.booking_status ?? "").trim().toLowerCase();
@@ -369,9 +393,6 @@ export default async function AdminDashboardPage({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">Admin dashboard</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Booking management</h1>
-          </div>
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm">
-            {items.length} total bookings
           </div>
         </div>
 
@@ -522,9 +543,11 @@ export default async function AdminDashboardPage({
                   <th className="px-4 py-3 font-semibold text-slate-700">Booking / Reference</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Customer</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Date &amp; Time</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Guests</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Area</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Payment</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Payment Method</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Payment Status</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Booking Status</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
                 </tr>
@@ -532,7 +555,7 @@ export default async function AdminDashboardPage({
               <tbody className="divide-y divide-slate-200">
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12">
+                    <td colSpan={10} className="px-4 py-12">
                       <div className="flex flex-col items-center justify-center text-center">
                         <div className="text-lg font-semibold text-slate-900">No bookings found</div>
                         <div className="mt-2 text-sm text-slate-500">Try changing your filters or search.</div>
@@ -541,51 +564,59 @@ export default async function AdminDashboardPage({
                   </tr>
                 )}
 
-                {filteredItems.map((booking) => (
-                  <tr key={booking.id} className="align-top">
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-slate-900">{formatShortReference(booking.reservation_code || booking.id)}</div>
-                      <div className="mt-1 text-xs text-slate-500">{booking.reservation_code ? "Ref" : "ID"}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-slate-900">{booking.customer_name || "Unknown"}</div>
-                      <div className="mt-1 text-xs text-slate-500">{booking.email || "No email"}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-slate-900">{formatDisplayDate(booking.booking_date)}</div>
-                      <div className="mt-1 text-xs text-slate-500">{formatDisplayTime(booking.booking_time)}</div>
-                    </td>
-                    <td className="px-4 py-4 text-slate-700">{booking.selected_area_id || "—"}</td>
-                    <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(booking.total_price)}</td>
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-slate-900">{formatPaymentMethod(booking.payment_method)}</div>
-                      <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(booking.payment_status)}`}>
-                        {formatPaymentStatus(booking.payment_status)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(booking.booking_status)}`}>
-                        {formatBookingStatus(booking.booking_status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <a
-                        href={buildAdminUrl({
-                          bookingId: booking.id,
-                          filter: activeFilter,
-                          search: searchQuery,
-                          date: selectedDate,
-                          bookingStatus: selectedBookingStatus,
-                          paymentStatus: selectedPaymentStatus,
-                          paymentMethod: selectedPaymentMethod,
-                        })}
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                      >
-                        View Details
-                      </a>
-                    </td>
-                  </tr>
-                ))}
+                {filteredItems.map((booking) => {
+                  const guestCount = formatGuestCount(booking);
+                  const areaName = booking.selected_area_id ? areaLookup[booking.selected_area_id] || "Selected area" : "Not selected";
+
+                  return (
+                    <tr key={booking.id} className="align-top">
+                      <td className="px-4 py-4">
+                        <div className="font-semibold text-slate-900">{formatShortReference(booking.reservation_code || booking.id)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{booking.reservation_code ? "Ref" : "ID"}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="font-semibold text-slate-900">{booking.customer_name || "Unknown"}</div>
+                        <div className="mt-1 text-xs text-slate-500">{booking.email || "No email"}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-slate-900">{formatDisplayDate(booking.booking_date)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{formatDisplayTime(booking.booking_time)}</div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-700">{guestCount}</td>
+                      <td className="px-4 py-4 text-slate-700">{areaName}</td>
+                      <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(booking.total_price)}</td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-slate-900">{formatPaymentMethod(booking.payment_method)}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(booking.payment_status)}`}>
+                          {formatPaymentStatus(booking.payment_status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(booking.booking_status)}`}>
+                          {formatBookingStatus(booking.booking_status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <a
+                          href={buildAdminUrl({
+                            bookingId: booking.id,
+                            filter: activeFilter,
+                            search: searchQuery,
+                            date: selectedDate,
+                            bookingStatus: selectedBookingStatus,
+                            paymentStatus: selectedPaymentStatus,
+                            paymentMethod: selectedPaymentMethod,
+                          })}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          View Details
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -609,6 +640,23 @@ export default async function AdminDashboardPage({
             </div>
 
             <div className="space-y-5 p-5 sm:p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getBookingStatusClasses(selectedBooking.booking_status)}`}>
+                    {formatBookingStatus(selectedBooking.booking_status).toUpperCase()}
+                  </span>
+                  <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    {formatPaymentMethod(selectedBooking.payment_method)}
+                  </span>
+                  <span className="ml-auto text-base font-black tracking-tight text-slate-900">{formatMoney(selectedBooking.total_price)}</span>
+                </div>
+                <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
+                  <div><span className="text-slate-500">Booking Status:</span> <span className="font-medium text-slate-900">{formatBookingStatus(selectedBooking.booking_status)}</span></div>
+                  <div><span className="text-slate-500">Payment Status:</span> <span className="font-medium text-slate-900">{formatPaymentStatus(selectedBooking.payment_status)}</span></div>
+                  <div><span className="text-slate-500">Payment Method:</span> <span className="font-medium text-slate-900">{formatPaymentMethod(selectedBooking.payment_method)}</span></div>
+                </div>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Reference</div>
@@ -642,8 +690,8 @@ export default async function AdminDashboardPage({
                   <div className="text-sm font-semibold text-slate-900">Booking</div>
                   <div className="mt-3 space-y-2 text-sm text-slate-700">
                     <div><span className="text-slate-500">Reference:</span> <span className="font-medium text-slate-900">{selectedBooking.reservation_code || formatShortReference(selectedBooking.id)}</span></div>
-                    <div><span className="text-slate-500">Area:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_area_id || "—"}</span></div>
-                    <div><span className="text-slate-500">Guests:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_equipment_ids ? String(selectedBooking.selected_equipment_ids).length : "0"}</span></div>
+                    <div><span className="text-slate-500">Area:</span> <span className="font-medium text-slate-900">{selectedBooking.selected_area_id ? areaLookup[selectedBooking.selected_area_id] || "Selected area" : "Not selected"}</span></div>
+                    <div><span className="text-slate-500">Guests:</span> <span className="font-medium text-slate-900">{formatGuestCount(selectedBooking)}</span></div>
                     <div><span className="text-slate-500">Amount:</span> <span className="font-medium text-slate-900">{formatMoney(selectedBooking.total_price)}</span></div>
                   </div>
                 </div>
