@@ -32,6 +32,14 @@ export function SiteHeader() {
   const [isHidden, setIsHidden] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const lastScrollY = useRef(0);
+  const languagePanelRef = useRef<HTMLDivElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeAllMenus = () => {
+    setIsMenuOpen(false);
+    setIsLanguageOpen(false);
+  };
 
   const NAV_LINKS = [
     { label: t("nav.home", "Home"), href: "#home" },
@@ -61,11 +69,58 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    if (isMenuOpen) {
+      setIsLanguageOpen(false);
+    }
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (isLanguageOpen) {
+      setIsMenuOpen(false);
+    }
+  }, [isLanguageOpen]);
+
+  useEffect(() => {
+    const shouldLockScroll = isMenuOpen || isLanguageOpen;
+    document.body.style.overflow = shouldLockScroll ? "hidden" : "";
+    document.body.style.touchAction = shouldLockScroll ? "none" : "";
+    document.body.style.position = shouldLockScroll ? "relative" : "";
+
     return () => {
       document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.body.style.position = "";
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, isLanguageOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (isMenuOpen && menuPanelRef.current && !menuPanelRef.current.contains(target) && !menuButtonRef.current?.contains(target)) {
+        setIsMenuOpen(false);
+      }
+
+      if (isLanguageOpen && languagePanelRef.current && !languagePanelRef.current.contains(target)) {
+        setIsLanguageOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+        setIsLanguageOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen, isLanguageOpen]);
 
   // Keep the header visible whenever the mobile menu is open, and always visible near the top.
   const hideHeader = isHidden && !isMenuOpen && !isAtTop;
@@ -145,23 +200,53 @@ export function SiteHeader() {
             </button>
 
             {isLanguageOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[140px] rounded-2xl border border-[#d8e2d8] bg-white p-1.5 shadow-[0_18px_32px_rgba(20,37,29,0.12)]">
-                {LANGUAGES.map((item) => (
-                  <button
-                    key={item.code}
-                    type="button"
-                    onClick={() => {
-                      setLanguage(item.code as LanguageCode);
-                      setIsLanguageOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                      language === item.code ? "bg-[#edf6ee] text-[#14251d] font-medium" : "text-[#3d4d45] hover:bg-[#f3f7f4]"
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    {language === item.code && <span className="text-xs">✓</span>}
-                  </button>
-                ))}
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#14251d]/35 p-3 backdrop-blur-[2px] sm:items-center" onClick={() => setIsLanguageOpen(false)}>
+                <div
+                  ref={languagePanelRef}
+                  className="w-full max-w-[390px] overflow-hidden rounded-[1.5rem] border border-[#dfe8df] bg-[#f8f6f1] shadow-[0_24px_60px_rgba(20,37,29,0.18)]"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between border-b border-[#dfe8df] px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a8462]">Language</p>
+                      <p className="mt-1 text-sm font-semibold text-[#14251d]">Choose your language</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#dfe8df] bg-white text-[#14251d] transition hover:bg-[#edf6ee]"
+                      onClick={() => setIsLanguageOpen(false)}
+                      aria-label="Close language selector"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 p-3">
+                    {LANGUAGES.map((item) => (
+                      <button
+                        key={item.code}
+                        type="button"
+                        onClick={() => {
+                          setLanguage(item.code as LanguageCode);
+                          setIsLanguageOpen(false);
+                        }}
+                        className={`flex items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition active:scale-[0.99] ${
+                          language === item.code
+                            ? "border-[#cfe8d6] bg-[#edf6ee] text-[#14251d] shadow-sm"
+                            : "border-[#e4e7df] bg-white text-[#3d4d45] hover:bg-[#f3f7f4]"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-base">{item.flag}</span>
+                          <span className="font-medium">{item.label}</span>
+                        </span>
+                        {language === item.code && <span className="text-xs font-bold text-[#19352a]">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -174,6 +259,7 @@ export function SiteHeader() {
           </Link>
 
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setIsMenuOpen((open) => !open)}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
@@ -198,58 +284,68 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <div
-        className={`fixed inset-0 top-0 z-40 flex flex-col justify-between bg-forest-dark px-5 pb-8 pt-24 transition-all duration-500 lg:hidden ${
-          isMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      >
-        <nav className="flex flex-col gap-1 overflow-y-auto">
-          {NAV_LINKS.map((link, index) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setIsMenuOpen(false)}
-              style={{ transitionDelay: isMenuOpen ? `${index * 40}ms` : "0ms" }}
-              className={`border-b border-white/10 py-4 text-xl font-semibold uppercase tracking-[0.08em] text-white/90 transition duration-300 hover:text-terracotta ${
-                isMenuOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
-              }`}
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-        <div className="mt-8 space-y-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-2">
-            <div className="flex items-center justify-between gap-2 text-white/80">
-              <span className="text-[10px] uppercase tracking-[0.12em]">Language</span>
-              <span className="flex items-center gap-2 text-sm font-medium"><span>{getLanguageMeta(language).flag}</span>{getLanguageMeta(language).label}</span>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {LANGUAGES.map((item) => (
-                <button
-                  key={item.code}
-                  type="button"
-                  onClick={() => {
-                    setLanguage(item.code as LanguageCode);
-                    setIsMenuOpen(false);
-                  }}
-                  className={`rounded-xl border px-2.5 py-2 text-left text-xs ${
-                    language === item.code ? "border-[#dff7e8] bg-white/10 text-white" : "border-white/10 bg-transparent text-white/70"
-                  }`}
-                >
-                  {item.flag} {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className={`fixed inset-0 z-[70] transition-all duration-300 lg:hidden ${isMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}>
+        <button
+          type="button"
+          aria-label="Close mobile navigation"
+          onClick={() => setIsMenuOpen(false)}
+          className="absolute inset-0 bg-[#14251d]/40 backdrop-blur-[2px]"
+        />
 
-          <Link
-            href="/book"
-            onClick={() => setIsMenuOpen(false)}
-            className="flex items-center justify-center rounded-full bg-terracotta px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-lg shadow-terracotta/30"
-          >
-            {t("nav.reservation", "Book Now")}
-          </Link>
+        <div
+          ref={menuPanelRef}
+          className={`absolute inset-y-0 right-0 flex w-[86vw] max-w-[20rem] flex-col justify-between bg-[#132a23] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-20 shadow-[0_25px_60px_rgba(20,37,29,0.28)] transition-all duration-300 ${
+            isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+          }`}
+        >
+          <nav className="flex flex-col gap-1 overflow-y-auto">
+            {NAV_LINKS.map((link, index) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMenuOpen(false)}
+                style={{ transitionDelay: isMenuOpen ? `${index * 40}ms` : "0ms" }}
+                className={`border-b border-white/10 py-4 text-xl font-semibold uppercase tracking-[0.08em] text-white/90 transition duration-300 hover:text-[#e8d7bf] ${
+                  isMenuOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+                }`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <div className="mt-8 space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-2">
+              <div className="flex items-center justify-between gap-2 text-white/80">
+                <span className="text-[10px] uppercase tracking-[0.12em]">Language</span>
+                <span className="flex items-center gap-2 text-sm font-medium"><span>{getLanguageMeta(language).flag}</span>{getLanguageMeta(language).label}</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {LANGUAGES.map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(item.code as LanguageCode);
+                      closeAllMenus();
+                    }}
+                    className={`rounded-xl border px-2.5 py-2 text-left text-xs ${
+                      language === item.code ? "border-[#dff7e8] bg-white/10 text-white" : "border-white/10 bg-transparent text-white/70"
+                    }`}
+                  >
+                    {item.flag} {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Link
+              href="/book"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center justify-center rounded-full bg-[#dca77d] px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-[#14251d] shadow-lg shadow-[#dca77d]/30"
+            >
+              {t("nav.reservation", "Book Now")}
+            </Link>
+          </div>
         </div>
       </div>
     </header>

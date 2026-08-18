@@ -146,7 +146,7 @@ function PaymentContent() {
   const shouldShowBankFlow = !!state.booking && (state.selectedMethod === "bank_transfer" || state.booking.payment_method === "bank_transfer") && !showCustomerStatusState && !state.reservationConfirmed;
 
   return (
-    <main className="booking-ui min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_35%),_linear-gradient(180deg,_#f7f4ee_0%,_#f3efe7_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8 lg:py-10">
+    <main className="booking-ui payment-page-root min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_35%),_linear-gradient(180deg,_#f7f4ee_0%,_#f3efe7_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8 lg:py-10">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link

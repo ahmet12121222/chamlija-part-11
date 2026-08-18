@@ -9,6 +9,8 @@ export function WeatherWidget() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
 
   const getUVLevel = (uvIndex: number): string => {
     if (uvIndex <= 2) return t("weatherLevels.low", "Low");
@@ -48,6 +50,21 @@ export function WeatherWidget() {
     const days = [t("days.sunday", "Sun"), t("days.monday", "Mon"), t("days.tuesday", "Tue"), t("days.wednesday", "Wed"), t("days.thursday", "Thu"), t("days.friday", "Fri"), t("days.saturday", "Sat")];
     return days[d.getDay()];
   };
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const syncViewport = () => {
+      setIsMobile(mediaQuery.matches);
+      if (!mediaQuery.matches) {
+        setShowForecast(false);
+      }
+    };
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -115,8 +132,92 @@ export function WeatherWidget() {
   const suitabilityColor =
     suitability.level === "excellent" ? "🟢" : suitability.level === "good" ? "🟡" : suitability.level === "caution" ? "🟠" : "🔴";
 
+  if (isMobile) {
+    return (
+      <section id="weather" className="relative scroll-mt-24 overflow-hidden px-4 py-6 sm:px-8 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-8 top-6 h-28 w-28 rounded-full bg-[#dfeffc]/75 blur-3xl" />
+          <div className="absolute right-6 top-10 h-32 w-32 rounded-full bg-[#fbe6a3]/35 blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-md">
+          <div className="rounded-[1.75rem] border border-[#14251d]/10 bg-white/60 p-4 shadow-[0_16px_36px_rgba(20,37,29,0.08)] backdrop-blur-sm">
+            <p className="text-[9px] font-medium uppercase tracking-[0.22em] text-[#7a8462]">Weather at Chamlija</p>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="text-4xl leading-none">{currentWeather.icon}</div>
+                <div>
+                  <div className="text-[2rem] font-bold leading-none tracking-[-0.05em] text-[#14251d]">{weather.current.temperature}°C</div>
+                  <div className="mt-1 text-sm text-[#49574f]">{currentWeather.label}</div>
+                </div>
+              </div>
+              <div className="text-right text-[10px] uppercase tracking-[0.1em] text-[#7a8462]">
+                {suitability.label}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2 border-t border-[#14251d]/10 pt-3 text-sm text-[#49574f]">
+              <div className="flex items-center justify-between gap-2">
+                <span>Feels like</span>
+                <span className="font-semibold text-[#14251d]">{weather.current.apparentTemperature}°C</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Humidity</span>
+                <span className="font-semibold text-[#14251d]">{weather.current.humidity}%</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Wind</span>
+                <span className="font-semibold text-[#14251d]">{weather.current.windSpeed} km/h</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Rain</span>
+                <span className="font-semibold text-[#14251d]">{weather.daily[0].precipitationProbability}%</span>
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm leading-5 text-[#49574f]">
+              {getVisitMessage(suitability.level, weather.current)}
+            </p>
+
+            {showForecast ? (
+              <div className="mt-4 border-t border-[#14251d]/10 pt-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#7a8462]">7-Day Forecast</p>
+                  <button type="button" onClick={() => setShowForecast(false)} className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#14251d]">Hide</button>
+                </div>
+                <div className="space-y-2">
+                  {weather.daily.map((day, i) => {
+                    const dayWeather = getWeatherCodeDescription(day.weatherCode);
+                    const dayName = getDayName(day.date, i);
+                    return (
+                      <div key={day.date} className="flex items-center justify-between rounded-xl border border-[#14251d]/8 bg-white/40 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{dayWeather.icon}</span>
+                          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[#14251d]">{dayName}</span>
+                        </div>
+                        <div className="text-right text-xs font-semibold text-[#14251d]">
+                          <span>{day.maxTemp}°</span>
+                          <span className="mx-1 text-[#49574f]">/ {day.minTemp}°</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowForecast(true)} className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-[#14251d]/10 bg-[#f3f4ef] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#14251d]">
+                View 7-day forecast
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section id="weather" className="relative scroll-mt-24 overflow-hidden px-4 py-16 sm:px-8 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
+    <section id="weather" className="relative scroll-mt-24 overflow-hidden px-4 py-10 sm:px-8 sm:py-16 lg:px-10 lg:py-28" style={{ background: skyBackground }}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -left-8 top-10 h-56 w-56 rounded-full bg-[#dfeffc]/75 blur-3xl" />
         <div className="absolute right-14 top-16 h-72 w-72 rounded-full bg-[#fbe6a3]/25 blur-3xl" />
@@ -142,25 +243,25 @@ export function WeatherWidget() {
       `}</style>
 
       <div className="relative mx-auto max-w-6xl">
-        <div className="mb-12">
-          <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#7a8462] sm:text-xs">{t("common.weather", "Weather")}</p>
-          <h2 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:text-4xl">
+        <div className="mb-6 sm:mb-12">
+          <p className="text-[9px] font-medium uppercase tracking-[0.22em] text-[#7a8462] sm:text-xs">{t("common.weather", "Weather")}</p>
+          <h2 className="mt-3 text-[1.9rem] font-semibold leading-[1.08] tracking-[-0.04em] text-[#14251d] sm:mt-4 sm:text-4xl">
             {t("weather.heading", "What is the weather like at Chamlija today?")}
           </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-[#49574f]">{t("weather.subheading", "Check the weather before planning your visit.")}</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#49574f] sm:mt-3">{t("weather.subheading", "Check the weather before planning your visit.")}</p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-8 lg:grid-cols-3">
           {/* Current Weather */}
           <div className="lg:col-span-1">
-            <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">Today</p>
-              <div className="mt-4 text-5xl">{currentWeather.icon}</div>
-              <div className="mt-4">
-                <div className="text-4xl font-bold text-[#14251d]">{weather.current.temperature}°</div>
+            <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-4 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)] sm:p-6">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#7a8462] sm:text-xs">Today</p>
+              <div className="mt-3 text-4xl sm:mt-4 sm:text-5xl">{currentWeather.icon}</div>
+              <div className="mt-3 sm:mt-4">
+                <div className="text-3xl font-bold text-[#14251d] sm:text-4xl">{weather.current.temperature}°</div>
                 <p className="mt-1 text-sm text-[#49574f]">{currentWeather.label}</p>
               </div>
-              <div className="mt-6 space-y-2 border-t border-[#14251d]/10 pt-4 text-xs text-[#49574f]">
+              <div className="mt-4 space-y-2 border-t border-[#14251d]/10 pt-3 text-[11px] text-[#49574f] sm:mt-6 sm:pt-4 sm:text-xs">
                 <div className="flex justify-between">
                   <span>Feels like</span>
                   <span className="font-medium text-[#14251d]">{weather.current.apparentTemperature}°</span>
@@ -181,19 +282,19 @@ export function WeatherWidget() {
           {/* UV & Precipitation */}
           <div className="lg:col-span-1">
             <div className="space-y-6">
-              <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">UV INDEX</p>
-                <div className="mt-4 flex items-baseline gap-3">
-                  <div className="text-4xl font-bold text-[#14251d]">{weather.current.uvIndex}</div>
+              <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-4 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)] sm:p-6">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#7a8462] sm:text-xs">UV INDEX</p>
+                <div className="mt-3 flex items-baseline gap-3 sm:mt-4">
+                  <div className="text-3xl font-bold text-[#14251d] sm:text-4xl">{weather.current.uvIndex}</div>
                   <span className="text-sm text-[#49574f]">{uvLevel}</span>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-[#49574f]">{getUVAdvice(weather.current.uvIndex)}</p>
+                <p className="mt-3 text-[11px] leading-5 text-[#49574f] sm:text-xs">{getUVAdvice(weather.current.uvIndex)}</p>
               </div>
-              <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">RAIN CHANCE</p>
-                <div className="mt-4">
-                  <div className="text-3xl font-bold text-[#14251d]">{weather.daily[0].precipitationProbability}%</div>
-                  <p className="mt-2 text-xs text-[#49574f]">{weather.daily[0].precipitation}mm expected</p>
+              <div className="weather-card rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-4 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)] sm:p-6">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#7a8462] sm:text-xs">RAIN CHANCE</p>
+                <div className="mt-3 sm:mt-4">
+                  <div className="text-2xl font-bold text-[#14251d] sm:text-3xl">{weather.daily[0].precipitationProbability}%</div>
+                  <p className="mt-2 text-[11px] text-[#49574f] sm:text-xs">{weather.daily[0].precipitation}mm expected</p>
                 </div>
               </div>
             </div>
@@ -201,12 +302,12 @@ export function WeatherWidget() {
 
           {/* Visit Suitability */}
           <div className="lg:col-span-1">
-            <div className="weather-card h-full rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-6 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)]">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#7a8462]">VISIT SUITABILITY</p>
-              <div className="mt-6 flex flex-col items-center justify-center space-y-4 text-center">
-                <div className="text-5xl">{suitabilityColor}</div>
+            <div className="weather-card h-full rounded-2xl border border-[#14251d]/8 bg-gradient-to-br from-white/70 via-[#f9f7f2]/70 to-white/60 p-4 backdrop-blur-sm transition hover:border-[#14251d]/15 hover:shadow-[0_12px_32px_rgba(20,37,29,0.08)] sm:p-6">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#7a8462] sm:text-xs">VISIT SUITABILITY</p>
+              <div className="mt-4 flex flex-col items-center justify-center space-y-4 text-center sm:mt-6">
+                <div className="text-4xl sm:text-5xl">{suitabilityColor}</div>
                 <p className="text-sm font-semibold text-[#14251d]">{suitability.label}</p>
-                <p className="text-xs leading-5 text-[#49574f]">{getVisitMessage(suitability.level, weather.current)}</p>
+                <p className="text-[11px] leading-5 text-[#49574f] sm:text-xs">{getVisitMessage(suitability.level, weather.current)}</p>
               </div>
             </div>
           </div>

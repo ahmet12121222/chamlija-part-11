@@ -94,6 +94,72 @@ body {
   text-wrap: pretty;
   position: relative;
   isolation: isolate;
+  overscroll-behavior-y: contain;
+}
+
+@media (max-width: 767px) {
+  html {
+    scroll-padding-top: 4.5rem;
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .booking-ui {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .booking-ui form {
+    gap: 1rem;
+  }
+
+  .booking-ui section,
+  .booking-ui aside,
+  .booking-ui > div,
+  .payment-page-root > div {
+    border-radius: 1.25rem;
+  }
+
+  .booking-ui .md\:grid-cols-2,
+  .booking-ui .md\:grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-ui .space-y-8 > * + * {
+    margin-top: 1.25rem;
+  }
+
+  .booking-ui button[type="submit"],
+  .payment-page-root button[type="button"] {
+    min-height: 52px;
+    width: 100%;
+    max-width: none;
+  }
+
+  .payment-page-root {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .payment-page-root .grid.gap-6 {
+    gap: 1rem;
+  }
+
+  .payment-page-root .flex-col.gap-3,
+  .payment-page-root .space-y-5,
+  .payment-page-root .space-y-3 {
+    gap: 0.75rem;
+  }
+
+  @supports (padding: max(0px)) {
+    .mobile-safe-bottom {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+  }
 }
 
 .decorative-leaf-layer {
