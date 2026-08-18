@@ -55,6 +55,70 @@ function formatGuestCount(booking: { adults?: number | null; children_3_plus?: n
   return `${total} guest${total === 1 ? "" : "s"}`;
 }
 
+function getVisitorCounts(booking: { adults?: number | null; children_3_plus?: number | null; children_under_3?: number | null }) {
+  const adults = Number(booking.adults ?? 0);
+  const children = Number(booking.children_3_plus ?? 0) + Number(booking.children_under_3 ?? 0);
+  return { adults, children, total: adults + children };
+}
+
+function getSouthAfricaDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getWeekStart(dateValue: string) {
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  const day = date.getUTCDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  return date.toISOString().slice(0, 10);
+}
+
+type PeriodSummary = {
+  reservations: number;
+  adults: number;
+  children: number;
+  visitors: number;
+  revenue: number;
+};
+
+function summarizeBookings(
+  bookings: Array<{
+    booking_date?: string | null;
+    booking_status?: string | null;
+    adults?: number | null;
+    children_3_plus?: number | null;
+    children_under_3?: number | null;
+    total_price?: number | null;
+  }>,
+  startDate: string,
+  endDate: string,
+): PeriodSummary {
+  const included = bookings.filter((booking) => {
+    const status = String(booking.booking_status ?? "").trim().toLowerCase();
+    const date = String(booking.booking_date ?? "");
+    return !["cancelled", "canceled"].includes(status) && date >= startDate && date <= endDate;
+  });
+
+  return included.reduce<PeriodSummary>(
+    (summary, booking) => {
+      const visitors = getVisitorCounts(booking);
+      return {
+        reservations: summary.reservations + 1,
+        adults: summary.adults + visitors.adults,
+        children: summary.children + visitors.children,
+        visitors: summary.visitors + visitors.total,
+        revenue: summary.revenue + Number(booking.total_price ?? 0),
+      };
+    },
+    { reservations: 0, adults: 0, children: 0, visitors: 0, revenue: 0 },
+  );
+}
+
 function formatDisplayStatusLabel(value: string | null | undefined) {
   const normalized = String(value ?? "pending").trim().toLowerCase();
 
@@ -403,6 +467,11 @@ export default async function AdminDashboardPage({
     refundPending: items.filter((booking) => String(booking.payment_status ?? "").trim().toLowerCase() === "refund_pending").length,
   };
 
+  const today = getSouthAfricaDate();
+  const weekStart = getWeekStart(today);
+  const todaySummary = summarizeBookings(items, today, today);
+  const weekSummary = summarizeBookings(items, weekStart, today);
+
   const selectedBooking = items.find((booking) => booking.id === selectedBookingId) ?? null;
   
   // Calculate discount information for selected booking
@@ -477,6 +546,27 @@ export default async function AdminDashboardPage({
               </div>
               <div className="mt-4 text-3xl font-black tracking-tight">{card.value}</div>
             </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {[
+            { label: "TODAY", summary: todaySummary },
+            { label: "THIS WEEK", summary: weekSummary },
+          ].map((period) => (
+            <section key={period.label} className="rounded-[2rem] border border-emerald-100 bg-emerald-50/60 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-black uppercase tracking-[0.2em] text-emerald-900">{period.label}</h2>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-800">Live booking data</span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="rounded-2xl border border-emerald-100 bg-white p-3"><div className="text-xs text-slate-500">Reservations</div><div className="mt-1 text-xl font-black text-slate-900">{period.summary.reservations}</div></div>
+                <div className="rounded-2xl border border-emerald-100 bg-white p-3"><div className="text-xs text-slate-500">Visitors</div><div className="mt-1 text-xl font-black text-slate-900">{period.summary.visitors}</div></div>
+                <div className="rounded-2xl border border-emerald-100 bg-white p-3"><div className="text-xs text-slate-500">Adults</div><div className="mt-1 text-xl font-black text-slate-900">{period.summary.adults}</div></div>
+                <div className="rounded-2xl border border-emerald-100 bg-white p-3"><div className="text-xs text-slate-500">Children</div><div className="mt-1 text-xl font-black text-slate-900">{period.summary.children}</div></div>
+                <div className="col-span-2 rounded-2xl border border-emerald-100 bg-white p-3 sm:col-span-1"><div className="text-xs text-slate-500">Estimated Revenue</div><div className="mt-1 text-xl font-black text-slate-900">{formatMoney(period.summary.revenue)}</div></div>
+              </div>
+            </section>
           ))}
         </div>
 
@@ -609,7 +699,9 @@ export default async function AdminDashboardPage({
                   <th className="px-4 py-3 font-semibold text-slate-700">Booking / Reference</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Customer</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Date &amp; Time</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Guests</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Adults</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Children</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Total People</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Area</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Payment Method</th>
@@ -621,7 +713,7 @@ export default async function AdminDashboardPage({
               <tbody className="divide-y divide-slate-200">
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12">
+                    <td colSpan={12} className="px-4 py-12">
                       <div className="flex flex-col items-center justify-center text-center">
                         <div className="text-lg font-semibold text-slate-900">No bookings found</div>
                         <div className="mt-2 text-sm text-slate-500">Try changing your filters or search.</div>
@@ -631,7 +723,7 @@ export default async function AdminDashboardPage({
                 )}
 
                 {filteredItems.map((booking) => {
-                  const guestCount = formatGuestCount(booking);
+                  const visitorCounts = getVisitorCounts(booking);
                   const areaName = booking.selected_area_id ? areaLookup[booking.selected_area_id] || "Selected area" : "Not selected";
 
                   return (
@@ -648,7 +740,9 @@ export default async function AdminDashboardPage({
                         <div className="font-medium text-slate-900">{formatDisplayDate(booking.booking_date)}</div>
                         <div className="mt-1 text-xs text-slate-500">{formatDisplayTime(booking.booking_time)}</div>
                       </td>
-                      <td className="px-4 py-4 text-slate-700">{guestCount}</td>
+                      <td className="px-4 py-4 text-slate-700">{visitorCounts.adults}</td>
+                      <td className="px-4 py-4 text-slate-700">{visitorCounts.children}</td>
+                      <td className="px-4 py-4 text-slate-700">{visitorCounts.total}</td>
                       <td className="px-4 py-4 text-slate-700">{areaName}</td>
                       <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(booking.total_price)}</td>
                       <td className="px-4 py-4">

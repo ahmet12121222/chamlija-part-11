@@ -5,6 +5,7 @@ import { NoCopyGuard } from "@/components/site/no-copy-guard";
 import { Hero } from "@/components/home/hero";
 import { AboutSection } from "@/components/home/about-section";
 import { ExperienceCategories } from "@/components/home/experience-categories";
+import { ChamlijaAreaMap } from "@/components/home/chamlija-area-map";
 import { PopularOptions } from "@/components/home/popular-options";
 import { FreeActivities } from "@/components/home/free-activities";
 import { Gallery } from "@/components/home/gallery";
@@ -26,6 +27,7 @@ export default async function HomePage() {
         <Hero />
         <AboutSection />
         <ExperienceCategories />
+        <ChamlijaAreaMap />
         <PopularOptions products={products} />
         <FreeActivities products={products} />
         <Gallery />

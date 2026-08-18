@@ -79,7 +79,7 @@ const containsAny = (text: string, values: string[]) =>
 
 const randomFrom = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
-const isTurkishInput = (text: string) => /[çğıöşü]/.test(text) || /aile|çocuk|gün|saat|piknik|rezervasyon|fiyat|merhaba|nasılsın/.test(text);
+const isTurkishInput = (text: string) => /[çğıöşü]/.test(text) || /aile|cocuk|çocuk|gün|gun|saat|piknik|rezervasyon|rezerv|fiyat|ne kadar|merhaba|nasılsın|nasilsin|pazar|cumartesi|pazartesi|bisiklet|basketbol|hayvan|yetişkin|yetiskin|ekipman|doğum|dogum|ox wagon|mini golf/.test(text);
 
 const parseNumbers = (text: string): number[] => {
   const matches = text.match(/\d+/g) ?? [];
@@ -1349,6 +1349,16 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
     children: parseNumbers(normalize(input)).slice(1).find((value) => value >= 0) ?? undefined,
   };
 
+  const directAnswer = getDirectAnswer(input, normalized);
+  if (directAnswer) {
+    return directAnswer;
+  }
+
+  const verifiedAnswer = getVerifiedDirectAnswer(input, normalized);
+  if (verifiedAnswer) {
+    return verifiedAnswer;
+  }
+
   const knownActivityHints = [
     "animal viewing",
     "yellow wood",
@@ -1445,4 +1455,132 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
     default:
       return generateUnknownResponse();
   }
+}
+
+function getVerifiedDirectAnswer(input: string, normalized: string): ChatResponse | null {
+  const isTurkish = isTurkishInput(input);
+  const adultMatch = normalized.match(/(\d+)\s*(yetiskin|adult)/);
+  const childMatch = normalized.match(/(\d+)\s*(cocuk|child|children|kid|kids)/);
+  const hasEntryQuestion = containsAny(normalized, ["giris", "ucret", "fiyat", "ne kadar", "how much", "price", "entry", "entrance"]);
+  const hasGuestCounts = Boolean(adultMatch || childMatch);
+
+  if (hasEntryQuestion && hasGuestCounts) {
+    const adults = Number(adultMatch?.[1] ?? 0);
+    const children = Number(childMatch?.[1] ?? 0);
+    const total = adults * VERIFIED_CHAMLIJA_FACTS.pricing.adult + children * VERIFIED_CHAMLIJA_FACTS.pricing.child3Plus;
+    const dayAnswer = getOpeningHoursAnswer(normalized, isTurkish);
+
+    return {
+      type: "pricing",
+      sections: [{
+        content: [
+          dayAnswer,
+          isTurkish
+            ? `${adults} yetişkin ve ${children} çocuk için giriş toplamı R${total}.`
+            : `Entry for ${adults} adults and ${children} children is R${total}.`,
+        ].filter(Boolean),
+      }],
+    };
+  }
+
+  if (hasEntryQuestion && containsAny(normalized, ["yetiskin", "adult"]) && !hasGuestCounts) {
+    return {
+      type: "pricing",
+      sections: [{ content: [isTurkish ? "Yetişkin giriş ücreti R50." : "Adult entrance is R50."] }],
+    };
+  }
+
+  if (containsAny(normalized, ["hayvan besleme", "animal feeding", "feed animals"]) && hasEntryQuestion) {
+    return {
+      type: "pricing",
+      sections: [{ content: [isTurkish ? "Hayvan besleme ücreti R30." : "Animal Feeding is R30."] }],
+    };
+  }
+
+  if (containsAny(normalized, ["ox wagon", "ox wagon tour", "okskar" ]) && hasEntryQuestion) {
+    return {
+      type: "pricing",
+      sections: [{ content: [isTurkish ? "OX Wagon Tour ücreti yetişkin R60, çocuk R50." : "The OX Wagon Tour is R60 for adults and R50 for children."] }],
+    };
+  }
+
+  if (containsAny(normalized, ["acik", "open", "calisma saat", "opening hours", "saatleri", "cumartesi", "pazar", "saturday", "sunday", "pazartesi", "monday", "sali", "tuesday", "carsamba", "wednesday", "persembe", "thursday", "cuma", "friday"])) {
+    return {
+      type: "text",
+      sections: [{ content: [getOpeningHoursAnswer(normalized, isTurkish)] }],
+    };
+  }
+
+  return null;
+}
+
+function getOpeningHoursAnswer(normalized: string, isTurkish: boolean): string {
+  const isMonday = containsAny(normalized, ["pazartesi", "monday"]);
+  const isSaturday = containsAny(normalized, ["cumartesi", "saturday"]);
+  const isSunday = containsAny(normalized, ["pazar", "sunday"]);
+  const day = isMonday
+    ? (isTurkish ? "Pazartesi" : "Monday")
+    : isSaturday && isSunday
+      ? (isTurkish ? "Cumartesi/Pazar" : "Saturday/Sunday")
+      : isSaturday
+        ? (isTurkish ? "Cumartesi" : "Saturday")
+        : isSunday
+          ? (isTurkish ? "Pazar" : "Sunday")
+          : "";
+
+  if (isMonday) {
+    return isTurkish ? "Pazartesi günleri kapalıyız." : "We are closed on Mondays.";
+  }
+
+  if (day) {
+    return isTurkish ? `${day} günü 09:00–18:00 açığız.` : `We are open ${day} from 09:00–18:00.`;
+  }
+
+  return isTurkish
+    ? "Pazartesi kapalıyız; Salı–Cuma 10:00–18:00, Cumartesi–Pazar 09:00–18:00 açığız."
+    : "We are closed on Mondays; Tuesday–Friday 10:00–18:00 and Saturday–Sunday 09:00–18:00.";
+}
+
+function getDirectAnswer(input: string, normalized: string): ChatResponse | null {
+  const isTurkish = isTurkishInput(input);
+  const equipmentActivity = containsAny(normalized, ["bisiklet", "bicycle", "basketbol", "basketball", "golf", "cricket", "beach volleyball"]);
+  const equipmentQuestion = containsAny(normalized, ["ekipman", "equipment", "getir", "bring", "own", "kendi", "gerekiyor", "need", "should", "var mi", "mevcut", "available"]);
+
+  if (containsAny(normalized, ["ata binme", "ata binebilir", "at binebilir", "at surebiliyor", "at surme", "at turu", "at biniliyor", "horse riding", "ride horse", "horseback"])) {
+    return {
+      type: "text",
+      sections: [{ content: [isTurkish ? "Maalesef şu an öyle bir hizmetimiz mevcut değil." : "Horse riding is not currently available at Chamlija."] }],
+    };
+  }
+
+  if (containsAny(normalized, ["dogum gunu kutla", "dogum gunu yap", "birthday celebration", "birthday party", "celebrate a birthday"])) {
+    return {
+      type: "text",
+      sections: [{ content: [isTurkish ? "Evet, tabii ki." : "Yes, of course."] }],
+    };
+  }
+
+  if (containsAny(normalized, ["dogum gunu pastasi", "kendi pastam", "birthday cake", "own cake"])) {
+    return {
+      type: "text",
+      sections: [{ content: [isTurkish ? "Evet, getirebilirsiniz." : "Yes, you can bring it."] }],
+    };
+  }
+
+  if (equipmentActivity && equipmentQuestion) {
+    const equipmentAnswer = containsAny(normalized, ["bisiklet", "bicycle"])
+      ? (isTurkish ? "Evet, kendi bisikletinizi getirmeniz gerekiyor." : "Yes, you need to bring your own bicycle.")
+      : containsAny(normalized, ["basketbol", "basketball"])
+        ? (isTurkish ? "Basketbol için kendi ekipmanınızı getirmeniz gerekiyor." : "For basketball, you need to bring your own equipment.")
+        : containsAny(normalized, ["golf"])
+          ? (isTurkish ? "Golf için kendi ekipmanınızı getirmeniz gerekiyor." : "For golf, you need to bring your own equipment.")
+          : (isTurkish ? "Evet, kendi ekipmanlarınızı getirmeniz gerekiyor." : "Yes, you need to bring your own equipment.");
+
+    return {
+      type: "text",
+      sections: [{ content: [equipmentAnswer] }],
+    };
+  }
+
+  return null;
 }
