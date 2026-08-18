@@ -204,7 +204,12 @@ export default async function AdminDashboardPage({
                 <div className="text-sm font-semibold text-emerald-900">Confirm Payment Received</div>
                 <p className="mt-2 text-sm text-emerald-800">Did the customer pay cash at the gate? Click below to confirm payment received.</p>
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <form action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST">
+                  <form
+                    action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST"
+                    data-review-form="true"
+                    data-review-action="approve"
+                    data-booking-id={selectedBooking.id}
+                  >
                     <button
                       type="submit"
                       className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -219,9 +224,15 @@ export default async function AdminDashboardPage({
             {selectedBooking.payment_status === "pending" && selectedBooking.payment_method === "bank_transfer" && (
               <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="text-sm font-semibold text-emerald-900">Confirm Payment</div>
-                <p className="mt-2 text-sm text-emerald-800">The payment is pending. Confirm it to mark the booking as paid and confirmed.</p>
+                <p className="mt-2 text-sm text-emerald-800">The payment is pending. Verify the bank transfer receipt to confirm and finalize this booking.</p>
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <form action={`/api/admin/bookings/${selectedBooking.id}/payment/confirm`} method="POST">
+                  <form
+                    action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST"
+                    data-review-form="true"
+                    data-review-action="approve"
+                    data-booking-id={selectedBooking.id}
+                  >
+                    <input type="hidden" name="action" value="approve" />
                     <button
                       type="submit"
                       className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -253,19 +264,37 @@ export default async function AdminDashboardPage({
                       >
                         Open receipt
                       </a>
-                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                      <form
+                        action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST"
+                        className="inline-block"
+                        data-review-form="true"
+                        data-review-action="approve"
+                        data-booking-id={selectedBooking.id}
+                      >
                         <input type="hidden" name="action" value="approve" />
                         <button type="submit" className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700">
                           Approve payment
                         </button>
                       </form>
-                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                      <form
+                        action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST"
+                        className="inline-block"
+                        data-review-form="true"
+                        data-review-action="reject"
+                        data-booking-id={selectedBooking.id}
+                      >
                         <input type="hidden" name="action" value="reject" />
                         <button type="submit" className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">
                           Reject receipt
                         </button>
                       </form>
-                      <form action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST" className="inline-block">
+                      <form
+                        action={`/api/admin/bookings/${selectedBooking.id}/payment/review`} method="POST"
+                        className="inline-block"
+                        data-review-form="true"
+                        data-review-action="resubmit"
+                        data-booking-id={selectedBooking.id}
+                      >
                         <input type="hidden" name="action" value="resubmit" />
                         <button type="submit" className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50">
                           Request new receipt

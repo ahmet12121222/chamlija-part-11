@@ -55,7 +55,7 @@ export async function POST(
       const { error: bookingUpdateError } = await supabaseAdmin
         .from("bookings")
         .update({
-          payment_status: "verified",
+          payment_status: "paid",
           booking_status: "confirmed",
           updated_at: new Date().toISOString(),
         })
@@ -68,8 +68,8 @@ export async function POST(
       const { error: paymentError } = await supabaseAdmin
         .from("payments")
         .update({
-          status: "verified",
-          review_status: "verified",
+          status: "paid",
+          review_status: "approved",
           reviewed_at: new Date().toISOString(),
           review_note: auditNote,
           rejection_reason: null,
@@ -89,12 +89,18 @@ export async function POST(
         booking_id: bookingId,
         admin_user_id: adminUser?.id ?? null,
         previous_status: previousStatus,
-        new_status: "verified",
+        new_status: "approved",
         admin_note: auditNote,
         rejection_reason: null,
       });
 
-      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+      return NextResponse.json({
+        ok: true,
+        bookingId,
+        paymentStatus: "paid",
+        bookingStatus: "confirmed",
+        reviewStatus: "approved",
+      });
     }
 
     if (action === "reject") {
@@ -135,7 +141,7 @@ export async function POST(
         rejection_reason: finalReason,
       });
 
-      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+      return NextResponse.json({ ok: true, bookingId, action: "reject" });
     }
 
     if (action === "resubmit") {
@@ -144,7 +150,7 @@ export async function POST(
         .from("payments")
         .update({
           status: "receipt_required",
-          review_status: "receipt_required",
+          review_status: "resubmission_requested",
           reviewed_at: new Date().toISOString(),
           review_note: auditNote,
           rejection_reason: finalReason,
@@ -171,12 +177,12 @@ export async function POST(
         booking_id: bookingId,
         admin_user_id: adminUser?.id ?? null,
         previous_status: previousStatus,
-        new_status: "receipt_required",
+        new_status: "resubmission_requested",
         admin_note: auditNote,
         rejection_reason: finalReason,
       });
 
-      return NextResponse.redirect(new URL("/admin?bookingId=" + bookingId, request.url));
+      return NextResponse.json({ ok: true, bookingId, action: "resubmit" });
     }
 
     return NextResponse.json({ error: "Invalid review action" }, { status: 400 });
