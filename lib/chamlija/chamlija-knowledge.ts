@@ -242,7 +242,7 @@ const getCasualReply = (text: string): string | null => {
   }
 
   if (containsAny(normalized, ["sen kimsin", "who are you", "who is this"])) {
-    return "Ben Chamlija AI 🌿 Chamlija hakkında bilgi vermek, aktiviteleri ve fiyatları açıklamak ve ziyaretinizi planlamanıza yardımcı olmak için buradayım.";
+    return "Ben Chamlija Support 🌿 Chamlija hakkında bilgi vermek, aktiviteleri ve fiyatları açıklamak ve ziyaretinizi planlamanıza yardımcı olmak için buradayım.";
   }
 
   if (containsAny(normalized, ["görüşürüz", "gorusuruz", "goodbye", "bye"])) {

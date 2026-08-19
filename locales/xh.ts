@@ -163,7 +163,7 @@ export const xh = {
     loadError: "Ikhathalogi yemveliso ayikwazi ukufakwa okwethutyana.",
   },
   ai: {
-    welcome: "👋 Wamkelekile kwiChamlija AI!\nNdilapha ukukunceda ukuba ulungise uhambo olumnandi.",
+    welcome: "👋 Wamkelekile kwiChamlija Support!\nNdilapha ukukunceda ukuba ulungise uhambo olumnandi.",
     quickActions: ["👋 Molo", "💰 Ixabiso", "🌿 Imisebenzi", "👨‍👩‍👧 Usapho", "📍 Indawo", "📅 Ukubhuka", "✨ Cwangcisa Usuku Lwam"],
     planMyDay: "✨ CWANGCISA USUKU LWAM",
   },

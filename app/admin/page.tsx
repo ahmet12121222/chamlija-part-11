@@ -283,6 +283,7 @@ function buildAdminUrl({
   bookingStatus = "",
   paymentStatus = "",
   paymentMethod = "",
+  customerEmail = "",
 }: {
   bookingId?: string | null;
   filter?: string;
@@ -291,6 +292,7 @@ function buildAdminUrl({
   bookingStatus?: string;
   paymentStatus?: string;
   paymentMethod?: string;
+  customerEmail?: string;
 }) {
   const params = new URLSearchParams();
 
@@ -318,6 +320,10 @@ function buildAdminUrl({
     params.set("paymentMethod", paymentMethod);
   }
 
+  if (customerEmail) {
+    params.set("customerEmail", customerEmail);
+  }
+
   if (bookingId) {
     params.set("bookingId", bookingId);
   }
@@ -337,6 +343,7 @@ export default async function AdminDashboardPage({
     bookingStatus?: string;
     paymentStatus?: string;
     paymentMethod?: string;
+    customerEmail?: string;
   }>;
 }) {
   try {
@@ -353,6 +360,7 @@ export default async function AdminDashboardPage({
   const selectedBookingStatus = typeof params.bookingStatus === "string" ? params.bookingStatus : "";
   const selectedPaymentStatus = typeof params.paymentStatus === "string" ? params.paymentStatus : "";
   const selectedPaymentMethod = typeof params.paymentMethod === "string" ? params.paymentMethod : "";
+  const selectedCustomerEmail = typeof params.customerEmail === "string" ? params.customerEmail.trim().toLowerCase() : "";
 
   const supabaseAdmin = getSupabaseAdminClient();
   const { data: bookings, error } = await supabaseAdmin
@@ -399,6 +407,30 @@ export default async function AdminDashboardPage({
   const areaLookup: Record<string, string> = Object.fromEntries(
     Object.entries(productLookup).filter(([id]) => areaIds.includes(id))
   );
+
+  const paymentRows = items.length
+    ? (await supabaseAdmin
+        .from("payments")
+        .select("booking_id, amount, status, created_at")
+        .in("booking_id", items.map((booking) => booking.id))
+        .order("created_at", { ascending: false }))?.data ?? []
+    : [];
+  const paymentLookup: Record<string, { paid: number; status: string | null }> = {};
+  for (const payment of paymentRows) {
+    if (paymentLookup[payment.booking_id]) continue;
+    const status = String(payment.status ?? "").trim().toLowerCase();
+    paymentLookup[payment.booking_id] = {
+      paid: ["paid", "verified", "approved"].includes(status) ? Math.max(Number(payment.amount ?? 0), 0) : 0,
+      status: payment.status ?? null,
+    };
+  }
+  const { data: rescheduleAreas } = await supabaseAdmin
+    .from("products")
+    .select("id, name")
+    .eq("category", "picnic_area")
+    .eq("is_active", true)
+    .eq("is_bookable", true)
+    .order("name", { ascending: true });
 
   const filteredItems = items.filter((booking) => {
     const normalizedMethod = normalizePaymentMethod(booking.payment_method);
@@ -486,6 +518,9 @@ export default async function AdminDashboardPage({
   }));
 
   const selectedBooking = items.find((booking) => booking.id === selectedBookingId) ?? null;
+  const customerBookings = selectedCustomerEmail
+    ? items.filter((booking) => String(booking.email ?? "").trim().toLowerCase() === selectedCustomerEmail)
+    : [];
   
   // Calculate discount information for selected booking
   const selectedBookingDiscount = selectedBooking && selectedBooking.created_at && selectedBooking.booking_date
@@ -526,7 +561,9 @@ export default async function AdminDashboardPage({
     : null;
   const refundAmountDue = Number(selectedPayment?.refund_amount ?? selectedPayment?.amount ?? selectedBookingWithDiscount?.total_price ?? 0);
   const paidAmount = Number(selectedPayment?.amount ?? 0);
-  const outstandingBalance = selectedBookingWithDiscount && paidAmount > 0 ? Math.max(Number(selectedBookingWithDiscount.total_price ?? 0) - paidAmount, 0) : null;
+  const outstandingBalance = selectedBookingWithDiscount
+    ? Math.max(Number(selectedBookingWithDiscount.total_price ?? 0) - paidAmount, 0)
+    : null;
   const additionalServiceNames = selectedBookingWithDiscount
     ? (Array.isArray(selectedBookingWithDiscount.selected_equipment_ids) ? selectedBookingWithDiscount.selected_equipment_ids : [])
         .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
@@ -736,7 +773,9 @@ export default async function AdminDashboardPage({
                   <th className="px-4 py-3 font-semibold text-slate-700">Children</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Total People</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Area</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Total</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Paid</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Outstanding</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Payment Method</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Payment Status</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Booking Status</th>
@@ -746,7 +785,7 @@ export default async function AdminDashboardPage({
               <tbody className="divide-y divide-slate-200">
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12">
+                    <td colSpan={14} className="px-4 py-12">
                       <div className="flex flex-col items-center justify-center text-center">
                         <div className="text-lg font-semibold text-slate-900">No bookings found</div>
                         <div className="mt-2 text-sm text-slate-500">Try changing your filters or search.</div>
@@ -766,7 +805,7 @@ export default async function AdminDashboardPage({
                         <div className="mt-1 text-xs text-slate-500">{booking.reservation_code ? "Ref" : "ID"}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="font-semibold text-slate-900">{booking.customer_name || "Unknown"}</div>
+                        <a href={buildAdminUrl({ customerEmail: booking.email, filter: activeFilter, search: searchQuery, date: selectedDate, bookingStatus: selectedBookingStatus, paymentStatus: selectedPaymentStatus, paymentMethod: selectedPaymentMethod })} className="font-semibold text-emerald-800 hover:text-emerald-950">{booking.customer_name || "Unknown"}</a>
                         <div className="mt-1 text-xs text-slate-500">{booking.email || "No email"}</div>
                       </td>
                       <td className="px-4 py-4">
@@ -778,6 +817,8 @@ export default async function AdminDashboardPage({
                       <td className="px-4 py-4 text-slate-700">{visitorCounts.total}</td>
                       <td className="px-4 py-4 text-slate-700">{areaName}</td>
                       <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(booking.total_price)}</td>
+                      <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(paymentLookup[booking.id]?.paid ?? 0)}</td>
+                      <td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(Math.max(Number(booking.total_price ?? 0) - (paymentLookup[booking.id]?.paid ?? 0), 0))}</td>
                       <td className="px-4 py-4">
                         <div className="font-medium text-slate-900">{formatPaymentMethod(booking.payment_method)}</div>
                       </td>
@@ -831,7 +872,7 @@ export default async function AdminDashboardPage({
               <article key={booking.id} className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex min-w-0 items-start justify-between gap-3 border-b border-slate-100 pb-3">
                   <div className="min-w-0">
-                    <div className="truncate font-bold text-slate-900" title={booking.customer_name || "Unknown"}>{booking.customer_name || "Unknown"}</div>
+                    <a href={buildAdminUrl({ customerEmail: booking.email, filter: activeFilter, search: searchQuery, date: selectedDate, bookingStatus: selectedBookingStatus, paymentStatus: selectedPaymentStatus, paymentMethod: selectedPaymentMethod })} className="block truncate font-bold text-emerald-800 hover:text-emerald-950" title="View customer history">{booking.customer_name || "Unknown"}</a>
                     <div className="mt-1 truncate text-xs text-slate-500" title={booking.email || "No email"}>{booking.email || "No email"}</div>
                   </div>
                   <div className="shrink-0 text-right">
@@ -845,7 +886,9 @@ export default async function AdminDashboardPage({
                   <div><div className="text-xs text-slate-500">Adults</div><div className="mt-1 font-semibold text-slate-900">{visitorCounts.adults}</div></div>
                   <div><div className="text-xs text-slate-500">Children</div><div className="mt-1 font-semibold text-slate-900">{visitorCounts.children}</div></div>
                   <div><div className="text-xs text-slate-500">Total people</div><div className="mt-1 font-semibold text-slate-900">{visitorCounts.total}</div></div>
-                  <div><div className="text-xs text-slate-500">Total price</div><div className="mt-1 font-semibold text-slate-900">{formatMoney(booking.total_price)}</div></div>
+                  <div><div className="text-xs text-slate-500">Total</div><div className="mt-1 font-semibold text-slate-900">{formatMoney(booking.total_price)}</div></div>
+                  <div><div className="text-xs text-slate-500">Paid</div><div className="mt-1 font-semibold text-slate-900">{formatMoney(paymentLookup[booking.id]?.paid ?? 0)}</div></div>
+                  <div><div className="text-xs text-slate-500">Outstanding</div><div className="mt-1 font-semibold text-slate-900">{formatMoney(Math.max(Number(booking.total_price ?? 0) - (paymentLookup[booking.id]?.paid ?? 0), 0))}</div></div>
                 </div>
                 <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                   <span className={`max-w-full truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentStatusClasses(booking.payment_status)}`}>{formatPaymentStatus(booking.payment_status)}</span>
@@ -863,6 +906,27 @@ export default async function AdminDashboardPage({
           })}
         </div>
       </div>
+
+      {selectedCustomerEmail && (
+        <section className="mt-6 min-w-0 overflow-hidden rounded-[2rem] border border-emerald-100 bg-emerald-50/60 p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Customer history</p>
+              <h2 className="mt-2 truncate text-2xl font-black text-slate-900">{customerBookings[0]?.customer_name || "Customer"}</h2>
+              <p className="mt-1 truncate text-sm text-slate-600">{customerBookings[0]?.email || selectedCustomerEmail} · {customerBookings[0]?.phone_number || "No phone recorded"}</p>
+            </div>
+            <a href={buildAdminUrl({ filter: activeFilter, search: searchQuery, date: selectedDate, bookingStatus: selectedBookingStatus, paymentStatus: selectedPaymentStatus, paymentMethod: selectedPaymentMethod })} className="shrink-0 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">Close</a>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4"><div className="text-xs text-slate-500">Total bookings</div><div className="mt-1 text-2xl font-black text-slate-900">{customerBookings.length}</div></div>
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4"><div className="text-xs text-slate-500">Total spent</div><div className="mt-1 text-lg font-black text-slate-900">{formatMoney(customerBookings.reduce((total, booking) => total + Number(booking.total_price ?? 0), 0))}</div></div>
+            <div className="col-span-2 rounded-2xl border border-emerald-100 bg-white p-4 sm:col-span-1"><div className="text-xs text-slate-500">Previous bookings</div><div className="mt-1 text-2xl font-black text-slate-900">{Math.max(customerBookings.length - 1, 0)}</div></div>
+          </div>
+          <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            {customerBookings.map((booking) => <div key={booking.id} className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3 text-sm"><span className="shrink-0 font-semibold text-slate-500">{formatDisplayDate(booking.booking_date)}</span><span className="min-w-0 flex-1 truncate font-semibold text-slate-900">{formatShortReference(booking.reservation_code || booking.id)}</span><span className="shrink-0 font-semibold text-slate-700">{formatMoney(booking.total_price)}</span><span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold ${getBookingStatusClasses(booking.booking_status)}`}>{formatBookingStatus(booking.booking_status)}</span></div>)}
+          </div>
+        </section>
+      )}
 
       {selectedBookingWithDiscount && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-3 sm:items-center sm:p-6">
@@ -955,6 +1019,16 @@ export default async function AdminDashboardPage({
                 <div className="text-sm font-semibold text-slate-900">Notes / Special Requirements</div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{selectedBookingWithDiscount.notes || "No extra notes."}</p>
               </div>
+
+              <form action={`/api/admin/bookings/${selectedBookingWithDiscount.id}/reschedule`} method="POST" className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <div className="text-sm font-semibold text-emerald-950">Reschedule booking</div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <label className="min-w-0 text-sm font-medium text-slate-700">Date<input name="bookingDate" type="date" defaultValue={selectedBookingWithDiscount.booking_date ?? ""} required className="mt-1 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
+                  <label className="min-w-0 text-sm font-medium text-slate-700">Time<input name="bookingTime" type="time" defaultValue={selectedBookingWithDiscount.booking_time?.slice(0, 5) ?? ""} required className="mt-1 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
+                  <label className="min-w-0 text-sm font-medium text-slate-700">Area<select name="areaId" defaultValue={selectedBookingWithDiscount.selected_area_id ?? ""} required className="mt-1 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="" disabled>Select area</option>{(rescheduleAreas ?? []).map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label>
+                </div>
+                <button type="submit" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 sm:w-auto">Save new schedule</button>
+              </form>
             </div>
 
             <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">

@@ -163,7 +163,7 @@ export const en = {
     loadError: "Unable to load product catalog at the moment.",
   },
   ai: {
-    welcome: "👋 Welcome to Chamlija AI!\nI'm here to help you plan an amazing visit.",
+    welcome: "👋 Welcome to Chamlija Support!\nI'm here to help you plan an amazing visit.",
     quickActions: ["👋 Hello", "💰 Prices", "🌿 Activities", "👨‍👩‍👧 Family", "📍 Location", "📅 Reservation", "✨ Plan My Day"],
     quickActionsTr: ["👋 Merhaba", "💰 Fiyatlar", "🌿 Aktiviteler", "👨‍👩‍👧 Aile", "📍 Konum", "📅 Rezervasyon", "✨ Günümü Planla"],
     quickActionsAf: ["👋 Hallo", "💰 Pryse", "🌿 Aktiwiteite", "👨‍👩‍👧 Familie", "📍 Ligging", "📅 Bespreking", "✨ Beplan My Dag"],

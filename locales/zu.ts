@@ -163,7 +163,7 @@ export const zu = {
     loadError: "Ikhathalogi yomkhiqizo ayikwazi ukulayishwa okwamanje.",
   },
   ai: {
-    welcome: "👋 Wamukelekile kuChamlija AI!\nNgilapha ukukusiza ukuhlela uhambo oluhle.",
+    welcome: "👋 Wamukelekile kuChamlija Support!\nNgilapha ukukusiza ukuhlela uhambo oluhle.",
     quickActions: ["👋 Sawubona", "💰 Amanani", "🌿 Imisebenzi", "👨‍👩‍👧 Umndeni", "📍 Indawo", "📅 Ukubhuka", "✨ Hlela Usuku Lwami"],
     planMyDay: "✨ HLELA USUKU LWAMI",
   },

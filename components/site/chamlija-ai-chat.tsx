@@ -52,7 +52,7 @@ export function ChamlijaAIChat() {
     {
       id: "welcome-1",
       sender: "ai",
-      text: t("ai.welcome", "👋 Welcome to Chamlija AI!\nI'm here to help you plan an amazing visit."),
+      text: t("ai.welcome", "👋 Welcome to Chamlija Support!\nI'm here to help you plan an amazing visit."),
     },
   ]);
 
@@ -322,7 +322,7 @@ export function ChamlijaAIChat() {
     const welcomeMessage: ChatMessage = {
       id: "welcome-1",
       sender: "ai",
-      text: t("ai.welcome", "👋 Welcome to Chamlija AI!\nI'm here to help you plan an amazing visit."),
+      text: t("ai.welcome", "👋 Welcome to Chamlija Support!\nI'm here to help you plan an amazing visit."),
     };
     setMessages([welcomeMessage]);
     setPlannerState(defaultPlannerState());
@@ -342,7 +342,7 @@ export function ChamlijaAIChat() {
 
       <button
         type="button"
-        aria-label="Chamlija AI Chat"
+        aria-label="Chamlija Support Chat"
         onClick={() => setIsOpen((current) => !current)}
         style={{ animation: "aiSupportFloat 2.4s ease-in-out infinite" }}
         className="fixed bottom-5 right-5 z-50 flex h-[68px] w-[68px] items-center justify-center rounded-full border border-[#bfe0de]/80 bg-gradient-to-br from-[#dff6ef] via-[#e0effb] to-[#edf7d4] text-[2rem] shadow-[0_16px_32px_rgba(67,115,100,0.2)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.04] hover:shadow-[0_18px_36px_rgba(67,115,100,0.24)] active:scale-95 sm:bottom-6 sm:right-6"
@@ -376,7 +376,7 @@ export function ChamlijaAIChat() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-[#14251d]">Chamlija AI</p>
+                      <p className="truncate text-sm font-semibold text-[#14251d]">Chamlija Support</p>
                       <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#5fbf7e] shadow-[0_0_0_3px_rgba(95,191,126,0.18)]" />
                     </div>
                     <p className="text-[10px] uppercase tracking-[0.12em] text-[#6b7d6a]">Online</p>
@@ -406,7 +406,7 @@ export function ChamlijaAIChat() {
                       {message.sender === "ai" && (
                         <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#677a68]">
                           <span>🌿</span>
-                          <span>Chamlija AI</span>
+                          <span>Chamlija Support</span>
                         </div>
                       )}
 
@@ -530,7 +530,7 @@ export function ChamlijaAIChat() {
                     <div className="max-w-[85%] sm:max-w-[80%]">
                       <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#677a68]">
                         <span>🌿</span>
-                        <span>Chamlija AI</span>
+                        <span>Chamlija Support</span>
                       </div>
                       <div className="flex items-center gap-2 rounded-2xl border border-[#eef0eb] bg-white/80 px-3.5 py-2.5 shadow-[0_8px_20px_rgba(20,37,29,0.06)]">
                         <span className="inline-block h-2.5 w-2.5 animate-bounce rounded-full bg-[#9bb5a3] [animation-delay:0ms]" />

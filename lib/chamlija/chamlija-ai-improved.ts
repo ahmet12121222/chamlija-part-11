@@ -1354,6 +1354,11 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
     return directAnswer;
   }
 
+  const photoShootAnswer = getPhotoShootAnswer(input, normalized);
+  if (photoShootAnswer) {
+    return photoShootAnswer;
+  }
+
   const verifiedAnswer = getVerifiedDirectAnswer(input, normalized);
   if (verifiedAnswer) {
     return verifiedAnswer;
@@ -1455,6 +1460,22 @@ export function buildChamlijaAIResponse(input: string): ChatResponse {
     default:
       return generateUnknownResponse();
   }
+}
+
+function getPhotoShootAnswer(input: string, normalized: string): ChatResponse | null {
+  if (!containsAny(normalized, ["fotograf", "photo", "photography"])) {
+    return null;
+  }
+
+  const isTurkish = isTurkishInput(input);
+  return {
+    type: "pricing",
+    sections: [{
+      content: [isTurkish
+        ? "Fotoğraf çekimi: Tüm gün R1.200, 0–4 saat R600."
+        : "Photo Shoot: Full day ZAR 1,200; 0–4 hours ZAR 600."],
+    }],
+  };
 }
 
 function getVerifiedDirectAnswer(input: string, normalized: string): ChatResponse | null {

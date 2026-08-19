@@ -163,7 +163,7 @@ export const af = {
     loadError: "Die produkatalog kan tans nie gelaai word nie.",
   },
   ai: {
-    welcome: "👋 Welkom by Chamlija AI!\nEk is hier om jou te help om 'n wonderlike besoek te beplan.",
+    welcome: "👋 Welkom by Chamlija Support!\nEk is hier om jou te help om 'n wonderlike besoek te beplan.",
     quickActions: ["👋 Hallo", "💰 Pryse", "🌿 Aktiwiteite", "👨‍👩‍👧 Familie", "📍 Ligging", "📅 Bespreking", "✨ Beplan My Dag"],
     planMyDay: "✨ BEPLAN MY DAG",
   },

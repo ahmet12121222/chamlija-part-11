@@ -163,7 +163,7 @@ export const tr = {
     loadError: "Ürün kataloğu şu anda yüklenemiyor.",
   },
   ai: {
-    welcome: "👋 Chamlija AI'ya hoş geldiniz!\nZiyaretinizi planlamada size yardımcı olmak için buradayım.",
+    welcome: "👋 Chamlija Support'a hoş geldiniz!\nZiyaretinizi planlamada size yardımcı olmak için buradayım.",
     quickActions: ["👋 Merhaba", "💰 Fiyatlar", "🌿 Aktiviteler", "👨‍👩‍👧 Aile", "📍 Konum", "📅 Rezervasyon", "✨ Günümü Planla"],
     planMyDay: "✨ GÜNÜMÜ PLANLA",
   },
